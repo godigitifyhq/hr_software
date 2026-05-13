@@ -20,7 +20,14 @@ const app: express.Express = express();
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
-app.use(helmet());
+app.use(
+  helmet({
+    // Frontend and API run on different origins in dev (localhost:3000 -> localhost:4000).
+    // Allow static assets like uploaded profile images to be embedded cross-origin.
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 const allowedOrigins = (
