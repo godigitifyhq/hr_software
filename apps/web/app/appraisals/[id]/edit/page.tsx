@@ -1,296 +1,410 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
-import { apiClient } from '@/lib/api-client'
-import { useAuthStore } from '@/store/auth'
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { Loader2, Save } from "lucide-react";
+import { z } from "zod";
+import { AppShell } from "@/components/layout/AppShell";
+import { withAuth } from "@/components/auth/withAuth";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  AppraisalItemRow,
+  type AppraisalItemView,
+} from "@/components/ui/AppraisalItemRow";
+import { api, type AppraisalSummary } from "@/lib/api";
+import { formatDateTime, relativeDate } from "@/lib/utils/dates";
+import { calcCompletedCount, calcWeightedScore } from "@/lib/utils/scores";
+import { getPrimaryRole } from "@/lib/utils/routing";
+import { useAuthStore } from "@/store/auth";
+import { appraisalItemSchema } from "@svgoi/zod-schemas";
 
-interface AppraisalItem {
-  id?: string
-  key: string
-  points: number
-  weight: number
-  notes?: string
-}
+type EditableItem = AppraisalItemView & {
+  key: string;
+  weight: number;
+  points: number | null;
+  notes: string;
+};
 
-interface AppraisalDetail {
-  id: string
-  status: 'DRAFT' | 'SUBMITTED' | 'HOD_REVIEW' | 'COMMITTEE_REVIEW' | 'HR_FINALIZED' | 'CLOSED'
-  locked: boolean
-  user: { id: string; firstName: string; lastName: string; email: string }
-  cycle: { name: string }
-  items: AppraisalItem[]
-}
+const itemsArraySchema = z.array(appraisalItemSchema);
 
-export default function AppraisalEditPage() {
-  const router = useRouter()
-  const params = useParams()
-  const appraisalId = params?.id as string
-  const { session, isHydrated } = useAuthStore()
-  const [appraisal, setAppraisal] = useState<AppraisalDetail | null>(null)
-  const [items, setItems] = useState<AppraisalItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+function AppraisalEditPage() {
+  const router = useRouter();
+  const params = useParams();
+  const appraisalId = params?.id as string;
+  const { session } = useAuthStore();
+  const [appraisal, setAppraisal] = useState<AppraisalSummary | null>(null);
+  const [items, setItems] = useState<EditableItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const saveTimer = useRef<number | null>(null);
+
+  const role = getPrimaryRole(session?.user.roles ?? []);
 
   useEffect(() => {
-    const { session, isHydrated } = useAuthStore.getState()
+    let active = true;
 
-    if (!isHydrated) {
-      const unsubscribe = useAuthStore.subscribe(state => {
-        if (state.isHydrated) {
-          if (!state.session) {
-            router.push('/login')
-          } else {
-            fetchAppraisal()
-          }
-          unsubscribe()
+    async function loadAppraisal() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await api.appraisals.getById(appraisalId);
+
+        if (active) {
+          setAppraisal(response.data);
+          setItems(
+            (response.data.items ?? []).map((item) => ({
+              id: item.id,
+              key: item.key ?? item.label ?? "",
+              label: item.label ?? item.key,
+              weight: item.weight,
+              selfScore: item.points ?? item.selfScore ?? null,
+              hodScore: item.hodScore ?? null,
+              committeeScore: item.committeeScore ?? null,
+              points: item.points ?? null,
+              notes: item.notes ?? "",
+            })),
+          );
+          setLastSavedAt(
+            response.data.updatedAt ?? response.data.createdAt ?? null,
+          );
         }
-      })
-      return
+      } catch (fetchError: any) {
+        if (active) {
+          setError(
+            fetchError?.response?.data?.message ||
+              fetchError?.message ||
+              "Failed to load appraisal for editing",
+          );
+          setAppraisal(null);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     }
 
-    if (!session) {
-      router.push('/login')
-      return
+    if (appraisalId) {
+      void loadAppraisal();
     }
 
-    fetchAppraisal()
-  }, [router, appraisalId])
+    return () => {
+      active = false;
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+      }
+    };
+  }, [appraisalId]);
 
-  async function fetchAppraisal() {
+  const canEdit = appraisal?.status === "DRAFT" && !appraisal.locked;
+  const completedCount = useMemo(
+    () =>
+      calcCompletedCount(
+        items.map((item) => ({ selfScore: item.points ?? 0 })),
+        "selfScore",
+      ),
+    [items],
+  );
+  const validItems = useMemo(
+    () =>
+      itemsArraySchema.safeParse(
+        items.map((item) => ({
+          selfScore: item.points ?? 0,
+          comment: item.notes ?? "",
+        })),
+      ),
+    [items],
+  );
+  const hasMissingScore = items.some(
+    (item) => item.points === null || item.points === undefined,
+  );
+  const weightedScore = useMemo(
+    () =>
+      calcWeightedScore(
+        items.map((item) => ({ weight: item.weight, selfScore: item.points })),
+      ),
+    [items],
+  );
+
+  const persistDraft = async () => {
+    if (!canEdit) {
+      return;
+    }
+
+    if (!validItems.success || hasMissingScore) {
+      return;
+    }
+
     try {
-      setLoading(true)
-      setError(null)
-      const { data } = await apiClient.get(`/appraisals/${appraisalId}`)
-      setAppraisal(data.data)
-      setItems(
-        (data.data.items || []).map((item: AppraisalItem) => ({
+      setSaving(true);
+      setError(null);
+      const response = await api.appraisals.update(appraisalId, {
+        items: items.map((item) => ({
           id: item.id,
           key: item.key,
-          points: item.points,
+          points: item.points ?? 0,
           weight: item.weight,
-          notes: item.notes || ''
-        }))
-      )
-    } catch (err: any) {
-      const message = err?.response?.data?.message || 'Failed to load appraisal for editing'
-      setError(message)
+          notes: item.notes?.trim() || undefined,
+        })),
+      });
+
+      setAppraisal(response.data);
+      setLastSavedAt(new Date().toISOString());
+      setIsDirty(false);
+    } catch (saveError: any) {
+      setError(
+        saveError?.response?.data?.message ||
+          saveError?.message ||
+          "Failed to save draft",
+      );
     } finally {
-      setLoading(false)
+      setSaving(false);
     }
-  }
+  };
 
-  const canEdit = appraisal?.status === 'DRAFT' && !appraisal.locked && appraisal.user.id === session?.user.id
-  const totalWeight = items.reduce((sum, item) => sum + Number(item.weight || 0), 0)
-  const weightedScore =
-    totalWeight > 0 ? items.reduce((sum, item) => sum + Number(item.points || 0) * Number(item.weight || 0), 0) / totalWeight : 0
-  const weightedPercent = totalWeight > 0 ? (weightedScore / 4) * 100 : 0
+  useEffect(() => {
+    if (!canEdit || !appraisal) {
+      return;
+    }
 
-  function updateItem(index: number, field: keyof AppraisalItem, value: string) {
-    setItems(current => {
-      const next = [...current]
-      const item = { ...next[index] }
+    if (!isDirty) {
+      return;
+    }
 
-      if (field === 'points' || field === 'weight') {
-        item[field] = Number(value)
-      } else {
-        item[field] = value
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+    }
+
+    saveTimer.current = window.setTimeout(() => {
+      void persistDraft();
+    }, 2000);
+
+    return () => {
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
       }
+    };
+  }, [appraisal, canEdit, isDirty, items]);
 
-      next[index] = item
-      return next
-    })
-  }
+  const updateItem = (index: number, patch: Partial<EditableItem>) => {
+    setItems((current) => {
+      const next = [...current];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+    setIsDirty(true);
+  };
 
-  function addItem() {
-    setItems(current => [...current, { key: '', points: 0, weight: 0, notes: '' }])
-  }
+  const saveDraftNow = async () => {
+    await persistDraft();
+  };
 
-  function removeItem(index: number) {
-    setItems(current => current.filter((_, itemIndex) => itemIndex !== index))
-  }
-
-  async function handleSave() {
-    const invalidItem = items.find(item => !item.key.trim())
-    if (invalidItem) {
-      setError('Every appraisal item needs a key before saving.')
-      return
-    }
-
-    try {
-      setSaving(true)
-      setError(null)
-      await apiClient.put(`/appraisals/${appraisalId}`, {
-        items: items.map(item => ({
-          id: item.id,
-          key: item.key.trim(),
-          points: Number(item.points),
-          weight: Number(item.weight),
-          notes: item.notes?.trim() || undefined
-        }))
-      })
-      router.push(`/appraisals/${appraisalId}`)
-    } catch (err: any) {
-      const message = err?.response?.data?.message || 'Failed to save appraisal'
-      setError(message)
-    } finally {
-      setSaving(false)
-    }
-  }
+  const submitAppraisal = async () => {
+    await persistDraft();
+    await api.appraisals.submit(appraisalId);
+    router.push("/appraisals");
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
-        <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-          <p className="text-sm text-slate-600">Loading appraisal editor…</p>
+      <AppShell role={role}>
+        <div className="space-y-4">
+          <div className="h-20 rounded-2xl border border-border bg-surface animate-pulse" />
+          <div className="h-40 rounded-2xl border border-border bg-surface animate-pulse" />
         </div>
-      </div>
-    )
+      </AppShell>
+    );
   }
 
   if (error && !appraisal) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
-        <div className="mx-auto max-w-5xl rounded-3xl border border-red-200 bg-white p-8 shadow-xl">
-          <p className="text-sm font-medium text-red-800">{error}</p>
-          <Link href={`/appraisals/${appraisalId}`} className="mt-6 inline-block rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-            Back to appraisal
-          </Link>
-        </div>
-      </div>
-    )
+      <AppShell role={role}>
+        <EmptyState
+          title="Unable to open appraisal"
+          description={error}
+          action={
+            <Link
+              href="/appraisals"
+              className="inline-flex h-9 items-center rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark"
+            >
+              Back to appraisals
+            </Link>
+          }
+        />
+      </AppShell>
+    );
   }
 
   if (!canEdit) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
-        <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-          <p className="text-sm font-medium text-slate-700">This appraisal can no longer be edited.</p>
-          <Link href={`/appraisals/${appraisalId}`} className="mt-6 inline-block rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-            Back to appraisal
-          </Link>
-        </div>
-      </div>
-    )
+      <AppShell role={role}>
+        <EmptyState
+          title="This appraisal can no longer be edited"
+          description="Only unlocked draft appraisals can be updated."
+          action={
+            <Link
+              href={`/appraisals/${appraisalId}`}
+              className="inline-flex h-9 items-center rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark"
+            >
+              Back to appraisal
+            </Link>
+          }
+        />
+      </AppShell>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
+    <AppShell role={role}>
+      <div className="sticky top-0 z-20 -mx-6 mb-6 border-b border-border bg-bg/95 px-6 py-4 backdrop-blur">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <Link href={`/appraisals/${appraisalId}`} className="text-sm font-medium text-slate-600 hover:text-slate-900">
-              ← Back to appraisal
-            </Link>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Edit Draft</h1>
-            <p className="text-sm text-slate-600">{appraisal?.cycle.name}</p>
-          </div>
-          <div className="text-right text-sm text-slate-600">
-            <p>Weighted score: {weightedScore.toFixed(2)}</p>
-            <p>{weightedPercent.toFixed(1)}%</p>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">
-            {error}
-          </div>
-        )}
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold">Appraisee</h2>
-              <p className="text-sm text-slate-600">
-                {appraisal?.user.firstName} {appraisal?.user.lastName} • {appraisal?.user.email}
-              </p>
-            </div>
-            <button
-              onClick={addItem}
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
-            >
-              Add Item
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {items.map((item, index) => (
-              <div key={item.id || `${item.key}-${index}`} className="rounded-2xl border border-slate-200 p-4">
-                <div className="grid gap-4 md:grid-cols-12">
-                  <div className="md:col-span-3">
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Key</label>
-                    <input
-                      value={item.key}
-                      onChange={event => updateItem(index, 'key', event.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none ring-0 focus:border-slate-900"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Points</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={4}
-                      step={1}
-                      value={item.points}
-                      onChange={event => updateItem(index, 'points', event.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none ring-0 focus:border-slate-900"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Weight</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      value={item.weight}
-                      onChange={event => updateItem(index, 'weight', event.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none ring-0 focus:border-slate-900"
-                    />
-                  </div>
-                  <div className="md:col-span-4">
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Notes</label>
-                    <input
-                      value={item.notes || ''}
-                      onChange={event => updateItem(index, 'notes', event.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none ring-0 focus:border-slate-900"
-                    />
-                  </div>
-                  <div className="flex items-end md:col-span-1">
-                    <button
-                      onClick={() => removeItem(index)}
-                      disabled={items.length === 1}
-                      className="w-full rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="rounded-full bg-slate-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-60"
-            >
-              {saving ? 'Saving…' : 'Save Draft'}
-            </button>
             <Link
               href={`/appraisals/${appraisalId}`}
-              className="rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+              className="text-sm font-medium text-text-2 transition hover:text-text"
             >
-              Cancel
+              ← Back to appraisal
             </Link>
+            <h1 className="mt-1 font-display text-2xl font-semibold text-text">
+              Self-Appraisal — {appraisal?.cycle?.name ?? "Current cycle"}
+            </h1>
+            <p className="mt-1 text-sm text-text-2">
+              {lastSavedAt
+                ? `Saved ${relativeDate(lastSavedAt)}`
+                : "Auto-saved after changes"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void saveDraftNow()}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2"
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubmitOpen(true)}
+              disabled={hasMissingScore || !validItems.success}
+              className="inline-flex h-9 items-center rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Submit Appraisal
+            </button>
           </div>
         </div>
-      </main>
-    </div>
-  )
+      </div>
+
+      {error ? (
+        <div className="mb-6 rounded-2xl border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
+          {error}
+        </div>
+      ) : null}
+
+      <section className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+            Completion
+          </p>
+          <p className="mt-2 font-display text-3xl font-bold text-text">
+            {completedCount}/{items.length}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+            Weighted score
+          </p>
+          <p className="mt-2 font-display text-3xl font-bold text-text">
+            {weightedScore.toFixed(2)}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+            Auto-save
+          </p>
+          <p className="mt-2 text-sm text-text-2">
+            {saving
+              ? "Saving..."
+              : lastSavedAt
+              ? `Saved ${relativeDate(lastSavedAt)}`
+              : "Waiting for your first change"}
+          </p>
+        </div>
+      </section>
+
+      <div className="space-y-4">
+        {items.map((item, index) => {
+          const scoreError =
+            item.points === null || item.points === undefined
+              ? "Please select a score before submitting."
+              : undefined;
+
+          return (
+            <AppraisalItemRow
+              key={item.id ?? `${item.key}-${index}`}
+              item={item}
+              mode="self"
+              onChange={(patch) =>
+                updateItem(index, { ...patch, notes: patch.notes ?? undefined })
+              }
+              notesValue={item.notes}
+              onNotesChange={(value) => updateItem(index, { notes: value })}
+              error={scoreError}
+            />
+          );
+        })}
+      </div>
+
+      <div className="sticky bottom-0 left-0 right-0 mt-8 border-t border-border bg-surface/95 px-6 py-4 backdrop-blur">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-text-2">
+            {completedCount} of {items.length} items scored
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void saveDraftNow()}
+              className="inline-flex h-9 items-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2"
+            >
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubmitOpen(true)}
+              disabled={hasMissingScore}
+              className="inline-flex h-9 items-center rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Submit Appraisal
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={submitOpen}
+        title="Submit appraisal"
+        description="Once submitted, you cannot edit your appraisal. Are you sure you want to submit?"
+        confirmLabel="Confirm Submit"
+        onCancel={() => setSubmitOpen(false)}
+        onConfirm={() => {
+          setSubmitOpen(false);
+          void submitAppraisal();
+        }}
+      />
+    </AppShell>
+  );
 }
+
+export default withAuth(AppraisalEditPage, ["EMPLOYEE"]);

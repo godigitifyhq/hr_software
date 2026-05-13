@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import authRouter from './routes/auth';
 import hodRouter from './routes/hod';
 import appraisalsRouter from './routes/appraisals';
+import adminRouter from './routes/admin';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.get('/api/health', (_req, res) => res.json({ success: true, message: 'API he
 app.get('/api/ping', (_req, res) => res.json({ success: true, message: 'pong' }));
 
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/hod', hodRouter);
 app.use('/api/v1/appraisals', appraisalsRouter);
 

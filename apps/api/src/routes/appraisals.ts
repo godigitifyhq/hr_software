@@ -91,7 +91,7 @@ async function canViewAppraisal(appraisal: NonNullable<Awaited<ReturnType<typeof
 
     return false;
 }
-router.get('/hr/dashboard', authenticateRequest, requireRoles('HR', 'SUPER_ADMIN'), async (_req: AuthenticatedRequest, res, next) => {
+router.get('/hr/dashboard', authenticateRequest, requireRoles('HR', ), async (_req: AuthenticatedRequest, res, next) => {
     try {
         const appraisals = await prisma.appraisal.findMany({
             include: {

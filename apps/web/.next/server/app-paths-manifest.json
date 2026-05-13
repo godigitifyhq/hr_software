@@ -1,9 +1,10 @@
 {
-  "/page": "app/page.js",
   "/hr-dashboard/page": "app/hr-dashboard/page.js",
   "/login/page": "app/login/page.js",
+  "/super-admin-dashboard/page": "app/super-admin-dashboard/page.js",
+  "/unauthorized/page": "app/unauthorized/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/page": "app/page.js",
   "/appraisals/[id]/page": "app/appraisals/[id]/page.js",
-  "/appraisals/page": "app/appraisals/page.js",
-  "/hod-review/page": "app/hod-review/page.js",
-  "/committee-review/page": "app/committee-review/page.js"
+  "/hod-review/page": "app/hod-review/page.js"
 }

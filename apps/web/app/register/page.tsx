@@ -1,198 +1,333 @@
-'use client'
+"use client";
 
-import { FormEvent, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { apiClient } from '@/lib/api-client'
-import { useAuthStore } from '@/store/auth'
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { registerSchema, type RegisterInput } from "@svgoi/zod-schemas";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/store/auth";
+
+type DepartmentOption = { id: string; name: string };
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const { session } = useAuthStore()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: ''
-  })
+  const router = useRouter();
+  const { session, isHydrated } = useAuthStore();
+  const [showPassword, setShowPassword] = useState(false);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  // Redirect if already logged in
-  if (session) {
-    router.push('/')
-    return null
-  }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterInput>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      departmentId: "",
+    },
+  });
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+  useEffect(() => {
+    if (isHydrated && session) {
+      router.replace("/");
+    }
+  }, [isHydrated, router, session]);
 
-    try {
-      // Validate form
-      if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
-        setError('All fields are required')
-        setLoading(false)
-        return
-      }
+  useEffect(() => {
+    let active = true;
 
-      if (formData.password !== formData.confirmPassword) {
-        setError('Passwords do not match')
-        setLoading(false)
-        return
-      }
+    async function loadDepartments() {
+      try {
+        const response = await fetch(
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
+          }/departments`,
+          {
+            credentials: "include",
+          },
+        );
 
-      if (formData.password.length < 8) {
-        setError('Password must be at least 8 characters')
-        setLoading(false)
-        return
-      }
+        if (!response.ok) {
+          throw new Error("Departments unavailable");
+        }
 
-      // Call register API
-      const response = await apiClient.post('/auth/register', {
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName
-      })
+        const payload = await response.json();
+        const list = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+          ? payload
+          : [];
 
-      if (response.data?.success) {
-        // Store session if returned (some APIs do this)
-        if (response.data.data?.accessToken) {
-          useAuthStore.getState().setSession({
-            accessToken: response.data.data.accessToken,
-            user: response.data.data.user
-          })
-          router.push('/')
-        } else {
-          // Otherwise redirect to login
-          setError('Account created! Please log in.')
-          setTimeout(() => router.push('/login'), 2000)
+        if (active) {
+          setDepartments(
+            list
+              .map((item: { id?: string; name?: string }) => ({
+                id: item.id ?? "",
+                name: item.name ?? "",
+              }))
+              .filter((item: DepartmentOption) => item.id && item.name),
+          );
+        }
+      } catch {
+        if (active) {
+          setDepartments([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingDepartments(false);
         }
       }
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Registration failed'
-      console.error('Register error:', {
-        status: err?.response?.status,
-        message,
-        data: err?.response?.data
-      })
-      setError(message)
-      setLoading(false)
     }
+
+    loadDepartments();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const onSubmit = async (values: RegisterInput) => {
+    setServerError(null);
+
+    try {
+      await api.auth.register(values);
+      router.push("/login?created=1");
+    } catch {
+      setServerError(
+        "Unable to create your account. Please verify the details and try again.",
+      );
+    }
+  };
+
+  const disabled = isSubmitting;
+  const submitLabel = useMemo(
+    () => (isSubmitting ? "Creating account..." : "Create account"),
+    [isSubmitting],
+  );
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-bg" />;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-10 shadow-xl">
-        <p className="text-sm font-medium uppercase tracking-[0.24em] text-sky-700">SVGOI</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Create Account</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Join SVGOI appraisal management system
+    <div className="grid min-h-screen lg:grid-cols-[45%_55%]">
+      <aside className="hidden flex-col justify-between bg-[#0F172A] px-10 py-8 text-white lg:flex">
+        <div className="font-display text-xl font-semibold">SVGOI</div>
+
+        <div className="max-w-xl space-y-8">
+          <div className="space-y-4">
+            <p className="font-display text-4xl font-bold leading-tight text-white">
+              Transparent appraisals.
+              <br />
+              Meaningful growth.
+            </p>
+            <p className="max-w-lg text-base leading-7 text-slate-400">
+              A structured, fair, and efficient performance review system for
+              every role in your organisation.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {[
+              "Self-appraisal with guided scoring",
+              "HOD and committee review workflows",
+              "HR-level reporting and audit trails",
+            ].map((item) => (
+              <div
+                key={item}
+                className="flex items-center gap-3 text-sm text-slate-300"
+              >
+                <Sparkles className="h-4 w-4 text-brand" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
+          SVGOI Appraisal Management System
         </p>
+      </aside>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="text-sm text-red-800">{error}</p>
+      <main className="flex items-center justify-center px-6 py-12 lg:px-10">
+        <div className="w-full max-w-[360px] space-y-8">
+          <div>
+            <h1 className="font-display text-[26px] font-semibold tracking-tight text-text">
+              Create your account
+            </h1>
+            <p className="mt-1 text-sm text-text-2">
+              Set up access to the appraisal system
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-text"
+                htmlFor="fullName"
+              >
+                Full name
+              </label>
+              <input
+                id="fullName"
+                type="text"
+                placeholder="Jane Doe"
+                disabled={disabled}
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none transition placeholder:text-text-3 focus:border-brand focus:ring-4 focus:ring-brand/10 disabled:cursor-not-allowed disabled:bg-surface-2"
+                {...register("fullName")}
+              />
+              {errors.fullName ? (
+                <p className="mt-1 text-xs text-danger">
+                  {errors.fullName.message}
+                </p>
+              ) : null}
             </div>
-          )}
 
-          <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-2">
-              First Name
-            </label>
-            <input
-              id="firstName"
-              type="text"
-              value={formData.firstName}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder-slate-400 transition focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/5"
-              placeholder="John"
-              disabled={loading}
-            />
-          </div>
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-text"
+                htmlFor="email"
+              >
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@svgoi.org"
+                disabled={disabled}
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none transition placeholder:text-text-3 focus:border-brand focus:ring-4 focus:ring-brand/10 disabled:cursor-not-allowed disabled:bg-surface-2"
+                {...register("email")}
+              />
+              {errors.email ? (
+                <p className="mt-1 text-xs text-danger">
+                  {errors.email.message}
+                </p>
+              ) : null}
+            </div>
 
-          <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-2">
-              Last Name
-            </label>
-            <input
-              id="lastName"
-              type="text"
-              value={formData.lastName}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder-slate-400 transition focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/5"
-              placeholder="Doe"
-              disabled={loading}
-            />
-          </div>
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-text"
+                htmlFor="departmentId"
+              >
+                Department
+              </label>
+              <select
+                id="departmentId"
+                disabled={disabled || loadingDepartments}
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10 disabled:cursor-not-allowed disabled:bg-surface-2"
+                {...register("departmentId")}
+              >
+                <option value="">Select department</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+              {!departments.length && !loadingDepartments ? (
+                <p className="mt-1 text-xs text-text-3">
+                  Departments could not be loaded. You can continue without
+                  selecting one.
+                </p>
+              ) : null}
+            </div>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder-slate-400 transition focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/5"
-              placeholder="john@example.com"
-              disabled={loading}
-            />
-          </div>
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-text"
+                htmlFor="password"
+              >
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create a secure password"
+                  disabled={disabled}
+                  className="h-10 w-full rounded-lg border border-border bg-surface px-3 pr-11 text-sm text-text outline-none transition placeholder:text-text-3 focus:border-brand focus:ring-4 focus:ring-brand/10 disabled:cursor-not-allowed disabled:bg-surface-2"
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-text-3 transition hover:text-text"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {errors.password ? (
+                <p className="mt-1 text-xs text-danger">
+                  {errors.password.message}
+                </p>
+              ) : null}
+            </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder-slate-400 transition focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/5"
-              placeholder="At least 8 characters"
-              disabled={loading}
-            />
-          </div>
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-text"
+                htmlFor="confirmPassword"
+              >
+                Confirm password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                placeholder="Repeat your password"
+                disabled={disabled}
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none transition placeholder:text-text-3 focus:border-brand focus:ring-4 focus:ring-brand/10 disabled:cursor-not-allowed disabled:bg-surface-2"
+                {...register("confirmPassword")}
+              />
+              {errors.confirmPassword ? (
+                <p className="mt-1 text-xs text-danger">
+                  {errors.confirmPassword.message}
+                </p>
+              ) : null}
+            </div>
 
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-2">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder-slate-400 transition focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/5"
-              placeholder="Repeat password"
-              disabled={loading}
-            />
-          </div>
+            {serverError ? (
+              <div className="rounded-lg border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
+                {serverError}
+              </div>
+            ) : null}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-center text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
-          >
-            {loading ? 'Creating account...' : 'Create Account'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={disabled}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
+              {submitLabel}
+            </button>
+          </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-slate-600">
-            Already have an account?{' '}
-            <Link href="/login" className="font-semibold text-slate-900 hover:text-slate-700">
-              Sign in
+          <p className="text-sm text-text-2">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-medium text-brand transition hover:text-brand-dark"
+            >
+              Sign in →
             </Link>
           </p>
         </div>
-      </div>
+      </main>
     </div>
-  )
+  );
 }
