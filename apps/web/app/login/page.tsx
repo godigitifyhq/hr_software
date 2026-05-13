@@ -99,7 +99,8 @@ export default function LoginPage() {
           <div className="space-y-4">
             <p className="font-display text-4xl font-bold leading-tight text-white">
               Transparent appraisals.
-              <br />
+              <br /
+              >
               Meaningful growth.
             </p>
             <p className="max-w-lg text-base leading-7 text-slate-400">
