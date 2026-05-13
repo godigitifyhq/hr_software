@@ -91,7 +91,7 @@ async function canViewAppraisal(appraisal: NonNullable<Awaited<ReturnType<typeof
 
     return false;
 }
-router.get('/hr/dashboard', authenticateRequest, requireRoles('HR', ), async (_req: AuthenticatedRequest, res, next) => {
+router.get('/hr/dashboard', authenticateRequest, requireRoles('HR', 'SUPER_ADMIN'), async (_req: AuthenticatedRequest, res, next) => {
     try {
         const appraisals = await prisma.appraisal.findMany({
             include: {
@@ -321,41 +321,6 @@ router.put('/:appraisalId', authenticateRequest, async (req: AuthenticatedReques
 });
 
 // Get user's appraisals
-router.get('/', authenticateRequest, async (req: AuthenticatedRequest, res, next) => {
-    try {
-        console.log('[Appraisals API] GET /appraisals', {
-            auth: { sub: req.auth?.sub, roles: req.auth?.roles },
-            headers: { auth: req.headers.authorization?.substring(0, 30) }
-        });
-
-        if (!req.auth?.sub) {
-            console.log('[Appraisals API] No auth.sub in request');
-            return res.status(401).json({ success: false, message: 'Authentication required' });
-        }
-
-        const appraisals = await prisma.appraisal.findMany({
-            where: { userId: req.auth.sub },
-            include: {
-                cycle: {
-                    select: { id: true, name: true, startDate: true, endDate: true, isActive: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        console.log('[Appraisals API] Found', appraisals.length, 'appraisals');
-
-        res.json({
-            success: true,
-            message: 'Appraisals retrieved',
-            data: appraisals
-        });
-    } catch (error) {
-        console.error('[Appraisals API] Error:', error);
-        next(error);
-    }
-});
-
 // Get single appraisal
 router.get('/:appraisalId', authenticateRequest, async (req: AuthenticatedRequest, res, next) => {
     try {

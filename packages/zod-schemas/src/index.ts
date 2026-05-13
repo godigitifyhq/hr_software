@@ -45,3 +45,4 @@ export type HodReviewInput = z.infer<typeof hodReviewSchema>;
 export type CommitteeReviewInput = z.infer<typeof committeeReviewSchema>;
 
 export * from "./appraisal";
+export * from "./faculty-profile";

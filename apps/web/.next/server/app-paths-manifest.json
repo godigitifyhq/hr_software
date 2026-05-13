@@ -1,8 +1,9 @@
 {
-  "/hr-dashboard/page": "app/hr-dashboard/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/register/page": "app/register/page.js",
+  "/faculty-dashboard/page": "app/faculty-dashboard/page.js",
   "/login/page": "app/login/page.js",
-  "/super-admin-dashboard/page": "app/super-admin-dashboard/page.js",
+  "/employee-dashboard/page": "app/employee-dashboard/page.js",
   "/unauthorized/page": "app/unauthorized/page.js",
-  "/appraisals/[id]/page": "app/appraisals/[id]/page.js",
-  "/hod-review/page": "app/hod-review/page.js"
+  "/page": "app/page.js"
 }

@@ -1,7 +1,16 @@
 // apps/web/src/lib/api.ts
 import { apiClient } from "@/lib/api-client";
-import type { ApiResponse, AppraisalStatus } from "@svgoi/shared-types";
-import type { LoginInput, RegisterInput } from "@svgoi/zod-schemas";
+import type {
+  ApiResponse,
+  AppraisalStatus,
+  DepartmentSummary,
+  FacultyProfile,
+  FacultyProfilePayload,
+} from "@svgoi/shared-types";
+import type {
+  LoginInput,
+  RegisterInput,
+} from "@svgoi/zod-schemas";
 
 export type Role =
   | "EMPLOYEE"
@@ -177,6 +186,25 @@ export const api = {
       unwrap<Record<string, unknown>>(apiClient.get("/appraisal-cycles")),
     getSubmissions: () =>
       unwrap<Record<string, unknown>>(apiClient.get("/appraisals")),
+  },
+  departments: {
+    list: () => unwrap<DepartmentSummary[]>(apiClient.get("/departments")),
+  },
+  faculty: {
+    getProfile: () =>
+      unwrap<FacultyProfile>(apiClient.get("/faculty/profile")),
+    saveProfile: (data: FacultyProfilePayload) =>
+      unwrap<FacultyProfile>(apiClient.put("/faculty/profile", data)),
+    uploadImage: async (file: File) => {
+      const buffer = await file.arrayBuffer();
+      return unwrap<FacultyProfile>(
+        apiClient.post("/faculty/profile/image", buffer, {
+          headers: {
+            "Content-Type": file.type,
+          },
+        }),
+      );
+    },
   },
 };
 

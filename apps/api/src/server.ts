@@ -4,12 +4,17 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+import path from "path";
 import authRouter from "./routes/auth";
 import hodRouter from "./routes/hod";
 import appraisalsRouter from "./routes/appraisals";
 import adminRouter from "./routes/admin";
+import facultyRouter from "./routes/faculty";
+import departmentsRouter from "./routes/departments";
+import { ensureFacultyUploadDir } from "./lib/facultyProfile";
 
 dotenv.config();
+ensureFacultyUploadDir();
 
 const app: express.Express = express();
 app.set("trust proxy", 1);
@@ -43,6 +48,7 @@ app.use(
 
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use(limiter);
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get("/api/health", (_req, res) =>
   res.json({ success: true, message: "API healthy" }),
@@ -53,7 +59,9 @@ app.get("/api/ping", (_req, res) =>
 );
 
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/departments", departmentsRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/faculty", facultyRouter);
 app.use("/api/v1/hod", hodRouter);
 app.use("/api/v1/appraisals", appraisalsRouter);
 

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { encryptSensitiveValue } from '../src/lib/security';
 
 const prisma = new PrismaClient();
 
@@ -122,18 +123,36 @@ async function main() {
 
     const passwordHash = await bcrypt.hash(adminPass, 10);
     const testPasswordHash = await bcrypt.hash(commonPassword, 10);
+    const seededPan = encryptSensitiveValue('ABCDE1234F');
+    const seededAadhar = encryptSensitiveValue('123412341234');
 
-    const csDept = await prisma.department.upsert({
-        where: { name: 'Computer Science' },
-        update: {},
-        create: { name: 'Computer Science', code: 'CSE' }
-    });
+    const departments = await Promise.all([
+        prisma.department.upsert({
+            where: { name: 'Computer Science' },
+            update: {},
+            create: { name: 'Computer Science', code: 'CSE' }
+        }),
+        prisma.department.upsert({
+            where: { name: 'Electronics and Communication' },
+            update: {},
+            create: { name: 'Electronics and Communication', code: 'ECE' }
+        }),
+        prisma.department.upsert({
+            where: { name: 'Applied Science' },
+            update: {},
+            create: { name: 'Applied Science', code: 'APS' }
+        }),
+        prisma.department.upsert({
+            where: { name: 'Pharmacy' },
+            update: {},
+            create: { name: 'Pharmacy', code: 'PHA' }
+        })
+    ]);
 
-    const eceDept = await prisma.department.upsert({
-        where: { name: 'Electronics and Communication' },
-        update: {},
-        create: { name: 'Electronics and Communication', code: 'ECE' }
-    });
+    const csDept = departments.find(dept => dept.name === 'Computer Science')!;
+    const eceDept = departments.find(dept => dept.name === 'Electronics and Communication')!;
+    const appliedScienceDept = departments.find(dept => dept.name === 'Applied Science')!;
+    const pharmacyDept = departments.find(dept => dept.name === 'Pharmacy')!;
 
     const admin = await upsertUser(adminEmail, {
         email: adminEmail,
@@ -188,7 +207,7 @@ async function main() {
         passwordHash: testPasswordHash,
         firstName: 'Ananya',
         lastName: 'Patel',
-        departmentId: csDept.id
+        departmentId: appliedScienceDept.id
     });
 
     const employeeUser = await upsertUser('employee@svgoi.local', {
@@ -196,7 +215,7 @@ async function main() {
         passwordHash: testPasswordHash,
         firstName: 'Rahul',
         lastName: 'Verma',
-        departmentId: eceDept.id
+        departmentId: pharmacyDept.id
     });
 
     await prisma.userRole.deleteMany({
@@ -214,6 +233,45 @@ async function main() {
             { userId: facultyUser.id, role: 'FACULTY' },
             { userId: employeeUser.id, role: 'EMPLOYEE' }
         ]
+    });
+
+    await prisma.facultyProfile.upsert({
+        where: { userId: facultyUser.id },
+        update: {
+            fatherName: 'Ramesh Patel',
+            dob: new Date('1989-08-11T00:00:00.000Z'),
+            dateOfJoining: new Date('2020-07-01T00:00:00.000Z'),
+            currentSalary: 72000,
+            lastIncrementDate: new Date('2025-07-01T00:00:00.000Z'),
+            panEncrypted: seededPan,
+            aadharEncrypted: seededAadhar,
+            tenthMarks: 91,
+            twelfthMarks: 88,
+            qualification: 'M.Tech',
+            graduation: 'B.Tech in Computer Science',
+            postGraduation: 'M.Tech in Artificial Intelligence',
+            phdDegree: null,
+            imageUrl: null,
+            totalExperience: 7
+        },
+        create: {
+            userId: facultyUser.id,
+            fatherName: 'Ramesh Patel',
+            dob: new Date('1989-08-11T00:00:00.000Z'),
+            dateOfJoining: new Date('2020-07-01T00:00:00.000Z'),
+            currentSalary: 72000,
+            lastIncrementDate: new Date('2025-07-01T00:00:00.000Z'),
+            panEncrypted: seededPan,
+            aadharEncrypted: seededAadhar,
+            tenthMarks: 91,
+            twelfthMarks: 88,
+            qualification: 'M.Tech',
+            graduation: 'B.Tech in Computer Science',
+            postGraduation: 'M.Tech in Artificial Intelligence',
+            phdDegree: null,
+            imageUrl: null,
+            totalExperience: 7
+        }
     });
 
     await prisma.department.update({

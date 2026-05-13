@@ -5,16 +5,38 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
-import { getPrimaryRole, getRoleHomePath } from "@/lib/utils/routing";
+import { resolvePostLoginPath } from "@/lib/faculty-access";
 
 export default function Home() {
   const router = useRouter();
   const { session, isHydrated } = useAuthStore();
 
   useEffect(() => {
-    if (isHydrated && session) {
-      router.replace(getRoleHomePath(getPrimaryRole(session.user.roles)));
+    let active = true;
+
+    async function redirectAuthenticatedUser() {
+      if (!isHydrated || !session) {
+        return;
+      }
+
+      let nextPath = "/";
+      try {
+        nextPath = await resolvePostLoginPath(session.user.roles);
+      } catch {
+        nextPath = session.user.roles.includes("FACULTY")
+          ? "/profile?complete=1"
+          : "/";
+      }
+      if (active) {
+        router.replace(nextPath);
+      }
     }
+
+    void redirectAuthenticatedUser();
+
+    return () => {
+      active = false;
+    };
   }, [isHydrated, router, session]);
 
   if (!isHydrated) {

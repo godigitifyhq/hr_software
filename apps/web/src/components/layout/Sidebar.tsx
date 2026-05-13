@@ -25,6 +25,13 @@ type NavItem = {
 };
 
 const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
+  FACULTY: {
+    title: "Faculty",
+    items: [
+      { label: "Dashboard", href: "/faculty-dashboard", icon: LayoutDashboard },
+      { label: "My Profile", href: "/profile", icon: FileText },
+    ],
+  },
   EMPLOYEE: {
     title: "Employee",
     items: [

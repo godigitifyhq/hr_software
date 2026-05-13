@@ -48,6 +48,7 @@ model User {
   publications  Publication[]
   patents       Patent[]
   consultancyGrants ConsultancyGrant[]
+  facultyProfile FacultyProfile?
   failedLoginCount Int       @default(0)
   lockedUntil   DateTime?
   passwordChangedAt DateTime? @default(now())
@@ -56,6 +57,28 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
+}
+
+model FacultyProfile {
+  userId             String   @id
+  user               User     @relation(fields: [userId], references: [id])
+  fatherName         String?
+  dob                DateTime?
+  dateOfJoining      DateTime?
+  currentSalary      Float?
+  lastIncrementDate  DateTime?
+  panEncrypted       String?
+  aadharEncrypted    String?
+  tenthMarks         Float?
+  twelfthMarks       Float?
+  qualification      String?
+  graduation         String?
+  postGraduation     String?
+  phdDegree          String?
+  imageUrl           String?
+  totalExperience    Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model Department {
