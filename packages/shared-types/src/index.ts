@@ -82,3 +82,54 @@ export interface FacultyProfilePayload {
   totalExperience: number;
   departmentId: UUID;
 }
+
+export interface FacultyAppraisalOption {
+  value: string;
+  label: string;
+  points: number;
+}
+
+export interface FacultyAppraisalCriterion {
+  key: string;
+  heading: string;
+  options: FacultyAppraisalOption[];
+}
+
+export interface FacultyIncrementBracket {
+  min: number;
+  max?: number;
+  incrementPercent: number;
+}
+
+export interface FacultyAppraisalPolicy {
+  criteria: FacultyAppraisalCriterion[];
+  maxPoints: number;
+  incrementBrackets: FacultyIncrementBracket[];
+}
+
+export interface FacultyEvidenceUpload {
+  criterionKey: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  url: string;
+}
+
+export interface FacultyAppraisalRequestItemPayload {
+  criterionKey: string;
+  selectedValue: string;
+  evidence?: FacultyEvidenceUpload | null;
+}
+
+export interface FacultyAppraisalRequestPayload {
+  items: FacultyAppraisalRequestItemPayload[];
+}
+
+export interface FacultyAppraisalRequestStatus {
+  hasRequest: boolean;
+  appraisalId?: string;
+  status?: AppraisalStatus;
+  submittedAt?: string | null;
+  totalPoints?: number | null;
+  incrementPercent?: number | null;
+}

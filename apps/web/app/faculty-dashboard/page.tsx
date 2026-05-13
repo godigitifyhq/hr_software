@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { GraduationCap, Loader2, PencilLine, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  GraduationCap,
+  Loader2,
+  PencilLine,
+  ShieldCheck,
+} from "lucide-react";
 import { withAuth } from "@/components/auth/withAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -10,7 +17,10 @@ import { api } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
-import type { FacultyProfile } from "@svgoi/shared-types";
+import type {
+  FacultyAppraisalRequestStatus,
+  FacultyProfile,
+} from "@svgoi/shared-types";
 
 function getImageSrc(imageUrl: string | null | undefined) {
   if (!imageUrl) {
@@ -24,6 +34,8 @@ function FacultyDashboardPage() {
   const { session } = useAuthStore();
   const role = getPrimaryRole(session?.user.roles ?? []);
   const [profile, setProfile] = useState<FacultyProfile | null>(null);
+  const [requestStatus, setRequestStatus] =
+    useState<FacultyAppraisalRequestStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,10 +46,14 @@ function FacultyDashboardPage() {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.faculty.getProfile();
+        const [profileResponse, statusResponse] = await Promise.all([
+          api.faculty.getProfile(),
+          api.faculty.getAppraisalStatus(),
+        ]);
 
         if (active) {
-          setProfile(response.data);
+          setProfile(profileResponse.data);
+          setRequestStatus(statusResponse.data);
         }
       } catch (loadError: any) {
         if (active) {
@@ -112,6 +128,20 @@ function FacultyDashboardPage() {
                 <PencilLine className="h-4 w-4" />
                 Edit Profile
               </Link>
+              {requestStatus?.hasRequest ? (
+                <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-success/20 bg-success-bg px-4 text-sm font-medium text-success">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Appraisal Requested
+                </div>
+              ) : (
+                <Link
+                  href="/faculty-dashboard/request-appraisal"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2"
+                >
+                  Request Appraisal
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
             </div>
           </section>
 

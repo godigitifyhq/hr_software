@@ -1,9 +1,8 @@
 {
-  "/profile/page": "app/profile/page.js",
-  "/register/page": "app/register/page.js",
-  "/faculty-dashboard/page": "app/faculty-dashboard/page.js",
-  "/login/page": "app/login/page.js",
-  "/employee-dashboard/page": "app/employee-dashboard/page.js",
   "/unauthorized/page": "app/unauthorized/page.js",
-  "/page": "app/page.js"
+  "/faculty-dashboard/page": "app/faculty-dashboard/page.js",
+  "/page": "app/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/login/page": "app/login/page.js",
+  "/faculty-dashboard/request-appraisal/page": "app/faculty-dashboard/request-appraisal/page.js"
 }

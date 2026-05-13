@@ -11,9 +11,13 @@ import {
   ensureFacultyUploadDir,
   encryptFacultyIdentity,
   facultyUploadDir,
+  isFacultyProfileComplete,
   serializeFacultyProfile,
 } from "../lib/facultyProfile";
-import { facultyProfileSchema } from "../schemas/faculty";
+import {
+  facultyAppraisalRequestSchema,
+  facultyProfileSchema,
+} from "../schemas/faculty";
 
 const router: express.Router = express.Router();
 
@@ -22,6 +26,226 @@ const allowedImageTypes: Record<string, string> = {
   "image/png": ".png",
   "image/webp": ".webp",
 };
+
+const allowedEvidenceTypes: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "application/pdf": ".pdf",
+};
+
+const facultyPolicy = {
+  criteria: [
+    {
+      key: "academics_average_result",
+      heading: "I. Academics Average Result (0 to 4)",
+      options: [
+        { value: "below_40", label: "Below 40%", points: 1 },
+        { value: "between_40_60", label: "40 - 60%", points: 2 },
+        { value: "between_60_80", label: "60 - 80%", points: 3 },
+        { value: "above_80", label: "Above 80%", points: 4 },
+      ],
+    },
+    {
+      key: "scopus_papers",
+      heading: "II. Scopus Paper Published / Accepted",
+      options: [
+        { value: "paper_1", label: "Paper 1", points: 1 },
+        { value: "paper_2", label: "Paper 2", points: 2 },
+        { value: "paper_3", label: "Paper 3", points: 3 },
+        { value: "paper_4", label: "Paper 4", points: 4 },
+      ],
+    },
+    {
+      key: "impact_factor",
+      heading: "III. Total Impact Factor During Assessment Year",
+      options: [
+        { value: "between_0_2", label: "0 to 2", points: 1 },
+        { value: "between_2_5", label: "2 to 5", points: 2 },
+        { value: "between_5_8", label: "5 to 8", points: 3 },
+        { value: "above_8", label: "Above 8", points: 4 },
+      ],
+    },
+    {
+      key: "book_chapter_book_patent",
+      heading: "IV. Book Chapter / Book / Patent",
+      options: [
+        { value: "book_chapter_1", label: "1 Book Chapter", points: 1 },
+        {
+          value: "book_or_design_patent_national",
+          label:
+            "Book Published / Design Patent / Book Edited / Book Authored (National Publisher)",
+          points: 2,
+        },
+        {
+          value: "book_or_edited_or_authored_international",
+          label:
+            "Book Published / Book Edited / Book Authored (International Publisher)",
+          points: 3,
+        },
+        {
+          value: "two_design_or_one_utility_granted",
+          label: "2 Design Patent / 1 Utility Patent (Granted)",
+          points: 4,
+        },
+      ],
+    },
+    {
+      key: "conference_seminar_symposia",
+      heading: "V. Conference / Seminar / Symposia",
+      options: [
+        { value: "attended_one", label: "Any one attended", points: 1 },
+        {
+          value: "presentation_national",
+          label: "Presentation - National Conference / Seminar / Symposium",
+          points: 2,
+        },
+        {
+          value: "organized_or_multiple_presentations",
+          label: "Organised Seminar / Presentation in two or more",
+          points: 3,
+        },
+        {
+          value: "organized_national_or_international",
+          label: "Organised National / International Conference in Campus",
+          points: 4,
+        },
+      ],
+    },
+    {
+      key: "fdp_stp",
+      heading: "VI. FDP / STP",
+      options: [
+        { value: "fdp_attended", label: "FDP attended", points: 1 },
+        { value: "fdp_conducted", label: "FDP conducted", points: 2 },
+        {
+          value: "online_course_or_stp",
+          label:
+            "Online course certificate like Symposium / MOOC etc / STP in campus or outside campus",
+          points: 3,
+        },
+        { value: "mooc_developed", label: "MOOC developed by faculty", points: 4 },
+      ],
+    },
+    {
+      key: "research_project_consultancy",
+      heading: "VII. Research Project / Consultancy Granted During Academic Year",
+      options: [
+        { value: "between_10000_50000", label: "10,000 to 50,000", points: 1 },
+        { value: "between_51000_100000", label: "51,000 to 1,00,000", points: 2 },
+        { value: "between_100000_200000", label: "1,00,000 to 2,00,000", points: 3 },
+        { value: "above_200000", label: "Above 2 Lakh", points: 4 },
+      ],
+    },
+    {
+      key: "research_guidance",
+      heading: "VIII. Research Guidance [PG Thesis Guided]",
+      options: [
+        { value: "one_complete_thesis", label: "1 Complete Thesis", points: 1 },
+        {
+          value: "one_thesis_one_paper",
+          label: "1 Complete Thesis + 1 Paper Published by Student",
+          points: 2,
+        },
+        { value: "two_thesis", label: "2 Thesis", points: 3 },
+        {
+          value: "two_thesis_two_papers",
+          label: "2 Thesis + 2 Papers Published by Student",
+          points: 4,
+        },
+      ],
+    },
+    {
+      key: "co_curricular_activities",
+      heading: "IX. Co-Curricular Activities",
+      options: [
+        {
+          value: "participate_institutional",
+          label: "Participate in institutional events",
+          points: 1,
+        },
+        { value: "coordinator_team_leader", label: "Coordinator / Team Leader", points: 2 },
+        {
+          value: "overall_coordinator",
+          label: "Overall Coordinator / Organizer",
+          points: 3,
+        },
+        { value: "sponsored_event", label: "Sponsored Event", points: 4 },
+      ],
+    },
+    {
+      key: "attendance",
+      heading: "X. Attendance",
+      options: [
+        { value: "more_than_80", label: "More than 80%", points: 1 },
+        { value: "more_than_90", label: "More than 90%", points: 2 },
+        { value: "more_than_95", label: "More than 95%", points: 3 },
+        { value: "hundred_percent", label: "100%", points: 4 },
+      ],
+    },
+    {
+      key: "awards_recognition",
+      heading: "XI. Awards / Recognition / Employee of the Month",
+      options: [
+        {
+          value: "university_or_community",
+          label:
+            "By university/community certificate or award/Employee of the Month",
+          points: 1,
+        },
+        { value: "state_award", label: "State Award", points: 2 },
+        {
+          value: "national_award_or_two_times_employee",
+          label: "National Award / 2 times Employee of the Month",
+          points: 3,
+        },
+        { value: "more_than_one_award", label: "More than 1 award", points: 4 },
+      ],
+    },
+    {
+      key: "hod_remarks_score",
+      heading: "XII. HOD's Remarks",
+      options: [
+        { value: "hod_1", label: "HOD remarks score 1", points: 1 },
+        { value: "hod_2", label: "HOD remarks score 2", points: 2 },
+        { value: "hod_3", label: "HOD remarks score 3", points: 3 },
+        { value: "hod_4", label: "HOD remarks score 4", points: 4 },
+      ],
+    },
+  ],
+  maxPoints: 48,
+  incrementBrackets: [
+    { min: 0, max: 12, incrementPercent: 5 },
+    { min: 13, max: 20, incrementPercent: 8 },
+    { min: 21, max: 30, incrementPercent: 10 },
+    { min: 31, incrementPercent: 15 },
+  ],
+};
+
+const criteriaByKey = new Map(
+  facultyPolicy.criteria.map((criterion) => [criterion.key, criterion]),
+);
+
+function calculateIncrement(totalPoints: number) {
+  const bracket = facultyPolicy.incrementBrackets.find((entry) => {
+    const lower = totalPoints >= entry.min;
+    const upper =
+      typeof entry.max === "number" ? totalPoints <= entry.max : true;
+    return lower && upper;
+  });
+  return bracket?.incrementPercent ?? 0;
+}
+
+function getEvidenceUploadDir() {
+  return path.join(process.cwd(), "uploads", "appraisal-evidence");
+}
+
+async function ensureEvidenceUploadDir() {
+  await fs.mkdir(getEvidenceUploadDir(), { recursive: true });
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9_.-]/g, "_");
+}
 
 function getProfileUser(userId: string) {
   return prisma.user.findUnique({
@@ -41,6 +265,19 @@ function getProfileUser(userId: string) {
       facultyProfile: true,
     },
   });
+}
+
+async function getActiveCycleOrThrow() {
+  const cycle = await prisma.appraisalCycle.findFirst({
+    where: { isActive: true },
+    orderBy: { startDate: "desc" },
+  });
+
+  if (!cycle) {
+    throw new Error("No active appraisal cycle found");
+  }
+
+  return cycle;
 }
 
 async function deletePreviousImage(imageUrl: string | null) {
@@ -229,6 +466,284 @@ router.post(
         success: true,
         message: "Profile image uploaded",
         data: serializeFacultyProfile(user),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+router.get(
+  "/appraisal/policy",
+  authenticateRequest,
+  requireRoles("FACULTY", "SUPER_ADMIN"),
+  async (_req: AuthenticatedRequest, res) => {
+    res.json({
+      success: true,
+      message: "Faculty appraisal policy",
+      data: facultyPolicy,
+    });
+  },
+);
+
+router.get(
+  "/appraisal/status",
+  authenticateRequest,
+  requireRoles("FACULTY", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const userId = req.auth?.sub;
+      if (!userId) {
+        res.status(401).json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const cycle = await getActiveCycleOrThrow();
+      const appraisal = await prisma.appraisal.findFirst({
+        where: {
+          userId,
+          cycleId: cycle.id,
+        },
+        select: {
+          id: true,
+          status: true,
+          submittedAt: true,
+          finalScore: true,
+          finalPercent: true,
+        },
+      });
+
+      if (!appraisal) {
+        res.json({
+          success: true,
+          message: "No appraisal request yet",
+          data: { hasRequest: false },
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: "Faculty appraisal status",
+        data: {
+          hasRequest: true,
+          appraisalId: appraisal.id,
+          status: appraisal.status,
+          submittedAt: appraisal.submittedAt?.toISOString() ?? null,
+          totalPoints: appraisal.finalScore ?? null,
+          incrementPercent: appraisal.finalPercent ?? null,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+router.post(
+  "/appraisal/evidence/:criterionKey",
+  authenticateRequest,
+  requireRoles("FACULTY", "SUPER_ADMIN"),
+  express.raw({
+    type: Object.keys(allowedEvidenceTypes),
+    limit: "5mb",
+  }),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const userId = req.auth?.sub;
+      if (!userId) {
+        res.status(401).json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const criterionKey = req.params.criterionKey;
+      if (!criteriaByKey.has(criterionKey)) {
+        res.status(400).json({ success: false, message: "Invalid criterion key" });
+        return;
+      }
+
+      const user = await getProfileUser(userId);
+      if (!user) {
+        res.status(404).json({ success: false, message: "User not found" });
+        return;
+      }
+
+      if (!isFacultyProfileComplete(user)) {
+        res.status(400).json({
+          success: false,
+          message: "Complete faculty profile before uploading evidence",
+        });
+        return;
+      }
+
+      const contentType = req.get("content-type")?.split(";")[0]?.trim() || "";
+      const extension = allowedEvidenceTypes[contentType];
+      const body = req.body;
+      const originalFileName = req.get("x-file-name") || "evidence";
+
+      if (!extension || !Buffer.isBuffer(body) || body.length === 0) {
+        res.status(400).json({ success: false, message: "Invalid evidence file" });
+        return;
+      }
+
+      await ensureEvidenceUploadDir();
+      const sanitizedName = sanitizeFileName(originalFileName);
+      const fileName = `${userId}-${criterionKey}-${Date.now()}-${sanitizedName}${path.extname(
+        sanitizedName,
+      )
+        ? ""
+        : extension}`;
+      const filePath = path.join(getEvidenceUploadDir(), fileName);
+      await fs.writeFile(filePath, body);
+
+      const payload = {
+        criterionKey,
+        fileName: originalFileName,
+        mime: contentType,
+        size: body.length,
+        url: `/uploads/appraisal-evidence/${fileName}`,
+      };
+
+      res.json({
+        success: true,
+        message: "Evidence uploaded",
+        data: payload,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+router.post(
+  "/appraisal/request",
+  authenticateRequest,
+  requireRoles("FACULTY", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const userId = req.auth?.sub;
+      if (!userId) {
+        res.status(401).json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const user = await getProfileUser(userId);
+      if (!user) {
+        res.status(404).json({ success: false, message: "User not found" });
+        return;
+      }
+
+      if (!isFacultyProfileComplete(user)) {
+        res.status(400).json({
+          success: false,
+          message: "Complete faculty profile before requesting appraisal",
+        });
+        return;
+      }
+
+      const parsed = facultyAppraisalRequestSchema.parse(req.body);
+      const selectedByKey = new Map(parsed.items.map((entry) => [entry.criterionKey, entry]));
+
+      if (selectedByKey.size !== facultyPolicy.criteria.length) {
+        res.status(400).json({
+          success: false,
+          message: "Please select one option for each criterion",
+        });
+        return;
+      }
+
+      const cycle = await getActiveCycleOrThrow();
+      const existingAppraisal = await prisma.appraisal.findFirst({
+        where: { userId, cycleId: cycle.id },
+      });
+
+      if (existingAppraisal && existingAppraisal.status !== "DRAFT") {
+        res.status(400).json({
+          success: false,
+          message: "Appraisal already requested for the active cycle",
+        });
+        return;
+      }
+
+      const appraisalItems = facultyPolicy.criteria.map((criterion) => {
+        const selected = selectedByKey.get(criterion.key);
+        if (!selected) {
+          throw new Error(`Missing selection for ${criterion.key}`);
+        }
+
+        const option = criterion.options.find(
+          (entry) => entry.value === selected.selectedValue,
+        );
+
+        if (!option) {
+          throw new Error(`Invalid option for ${criterion.heading}`);
+        }
+
+        return {
+          key: criterion.key,
+          points: option.points,
+          weight: 1,
+          notes: JSON.stringify({
+            heading: criterion.heading,
+            selectedValue: option.value,
+            selectedLabel: option.label,
+            evidence: selected.evidence ?? null,
+          }),
+        };
+      });
+
+      const totalPoints = appraisalItems.reduce((sum, item) => sum + item.points, 0);
+      const incrementPercent = calculateIncrement(totalPoints);
+
+      const appraisalId =
+        existingAppraisal?.id ??
+        (
+          await prisma.appraisal.create({
+            data: {
+              cycleId: cycle.id,
+              userId,
+              status: "DRAFT",
+            },
+            select: { id: true },
+          })
+        ).id;
+
+      await prisma.$transaction(async (transaction) => {
+        await transaction.appraisalItem.deleteMany({
+          where: { appraisalId },
+        });
+
+        await transaction.appraisalItem.createMany({
+          data: appraisalItems.map((item) => ({
+            appraisalId,
+            key: item.key,
+            points: item.points,
+            weight: item.weight,
+            notes: item.notes,
+          })),
+        });
+
+        await transaction.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            status: "SUBMITTED",
+            submittedAt: new Date(),
+            locked: true,
+            finalScore: totalPoints,
+            finalPercent: incrementPercent,
+          },
+        });
+      });
+
+      res.json({
+        success: true,
+        message: "Appraisal request submitted successfully",
+        data: {
+          appraisalId,
+          totalPoints,
+          incrementPercent,
+          status: "SUBMITTED",
+        },
       });
     } catch (error) {
       next(error);

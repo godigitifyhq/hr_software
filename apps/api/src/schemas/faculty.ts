@@ -19,3 +19,23 @@ export const facultyProfileSchema = z.object({
   totalExperience: numericValue.min(0, "Total experience is required"),
   departmentId: z.string().uuid("Department is required"),
 });
+
+export const facultyAppraisalEvidenceSchema = z.object({
+  criterionKey: z.string().min(1),
+  fileName: z.string().min(1),
+  mime: z.string().min(1),
+  size: z.number().int().positive(),
+  url: z.string().min(1),
+});
+
+export const facultyAppraisalRequestSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        criterionKey: z.string().min(1),
+        selectedValue: z.string().min(1),
+        evidence: facultyAppraisalEvidenceSchema.optional().nullable(),
+      }),
+    )
+    .min(1),
+});

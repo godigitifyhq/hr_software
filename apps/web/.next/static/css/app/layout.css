@@ -771,6 +771,9 @@ video {
 .mb-4 {
   margin-bottom: 1rem;
 }
+.mb-5 {
+  margin-bottom: 1.25rem;
+}
 .mb-6 {
   margin-bottom: 1.5rem;
 }
@@ -2078,6 +2081,10 @@ select {
 
   .lg\:grid-cols-\[1\.2fr_1fr\] {
     grid-template-columns: 1.2fr 1fr;
+  }
+
+  .lg\:grid-cols-\[1fr_200px\] {
+    grid-template-columns: 1fr 200px;
   }
 
   .lg\:grid-cols-\[280px_1fr\] {

@@ -4,6 +4,10 @@ import type {
   ApiResponse,
   AppraisalStatus,
   DepartmentSummary,
+  FacultyAppraisalPolicy,
+  FacultyAppraisalRequestPayload,
+  FacultyAppraisalRequestStatus,
+  FacultyEvidenceUpload,
   FacultyProfile,
   FacultyProfilePayload,
 } from "@svgoi/shared-types";
@@ -205,6 +209,27 @@ export const api = {
         }),
       );
     },
+    getAppraisalPolicy: () =>
+      unwrap<FacultyAppraisalPolicy>(apiClient.get("/faculty/appraisal/policy")),
+    getAppraisalStatus: () =>
+      unwrap<FacultyAppraisalRequestStatus>(
+        apiClient.get("/faculty/appraisal/status"),
+      ),
+    uploadAppraisalEvidence: async (criterionKey: string, file: File) => {
+      const buffer = await file.arrayBuffer();
+      return unwrap<FacultyEvidenceUpload>(
+        apiClient.post(`/faculty/appraisal/evidence/${criterionKey}`, buffer, {
+          headers: {
+            "Content-Type": file.type,
+            "X-File-Name": file.name,
+          },
+        }),
+      );
+    },
+    submitAppraisalRequest: (payload: FacultyAppraisalRequestPayload) =>
+      unwrap<Record<string, unknown>>(
+        apiClient.post("/faculty/appraisal/request", payload),
+      ),
   },
 };
 

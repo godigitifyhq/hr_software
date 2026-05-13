@@ -29,6 +29,11 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
     title: "Faculty",
     items: [
       { label: "Dashboard", href: "/faculty-dashboard", icon: LayoutDashboard },
+      {
+        label: "Request Appraisal",
+        href: "/faculty-dashboard/request-appraisal",
+        icon: ClipboardList,
+      },
       { label: "My Profile", href: "/profile", icon: FileText },
     ],
   },
