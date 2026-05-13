@@ -3,8 +3,6 @@
   "/login/page": "app/login/page.js",
   "/super-admin-dashboard/page": "app/super-admin-dashboard/page.js",
   "/unauthorized/page": "app/unauthorized/page.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/page": "app/page.js",
   "/appraisals/[id]/page": "app/appraisals/[id]/page.js",
   "/hod-review/page": "app/hod-review/page.js"
 }

@@ -240,7 +240,7 @@ export default function SuperAdminDashboard() {
                     <p className="text-sm text-slate-600">Finalized</p>
                     <p className="mt-1 text-3xl font-semibold text-slate-900">
                       {stats.appraisalsByStatus.find(
-                        (s) => s.status === "HR_FINALIZED"
+                        (s) => s.status === "HR_FINALIZED",
                       )?._count || 0}
                     </p>
                   </div>
@@ -257,10 +257,10 @@ export default function SuperAdminDashboard() {
                     <p className="text-sm text-slate-600">In Progress</p>
                     <p className="mt-1 text-3xl font-semibold text-slate-900">
                       {(stats.appraisalsByStatus.find(
-                        (s) => s.status === "SUBMITTED"
+                        (s) => s.status === "SUBMITTED",
                       )?._count || 0) +
                         (stats.appraisalsByStatus.find(
-                          (s) => s.status === "HOD_REVIEW"
+                          (s) => s.status === "HOD_REVIEW",
                         )?._count || 0)}
                     </p>
                   </div>
@@ -341,7 +341,10 @@ export default function SuperAdminDashboard() {
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-500">
+                    <td
+                      colSpan={4}
+                      className="px-6 py-8 text-center text-sm text-slate-500"
+                    >
                       No users found
                     </td>
                   </tr>
