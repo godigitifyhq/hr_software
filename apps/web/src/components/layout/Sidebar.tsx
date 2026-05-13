@@ -25,6 +25,18 @@ type NavItem = {
 };
 
 const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
+  FACULTY: {
+    title: "Faculty",
+    items: [
+      { label: "Dashboard", href: "/faculty-dashboard", icon: LayoutDashboard },
+      {
+        label: "Request Appraisal",
+        href: "/faculty-dashboard/request-appraisal",
+        icon: ClipboardList,
+      },
+      { label: "My Profile", href: "/profile", icon: FileText },
+    ],
+  },
   EMPLOYEE: {
     title: "Employee",
     items: [
@@ -35,7 +47,12 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
   HOD: {
     title: "HOD",
     items: [
-      { label: "My Department", href: "/hod-review", icon: Building2 },
+      { label: "Dashboard", href: "/hod-review", icon: LayoutDashboard },
+      {
+        label: "Request Self Appraisal",
+        href: "/hod-review/request-appraisal",
+        icon: ClipboardList,
+      },
       { label: "My Profile", href: "/profile", icon: FileText },
     ],
   },

@@ -1,7 +1,20 @@
 // apps/web/src/lib/api.ts
 import { apiClient } from "@/lib/api-client";
-import type { ApiResponse, AppraisalStatus } from "@svgoi/shared-types";
-import type { LoginInput, RegisterInput } from "@svgoi/zod-schemas";
+import type {
+  ApiResponse,
+  AppraisalStatus,
+  DepartmentSummary,
+  FacultyAppraisalPolicy,
+  FacultyAppraisalRequestPayload,
+  FacultyAppraisalRequestStatus,
+  FacultyEvidenceUpload,
+  FacultyProfile,
+  FacultyProfilePayload,
+} from "@svgoi/shared-types";
+import type {
+  LoginInput,
+  RegisterInput,
+} from "@svgoi/zod-schemas";
 
 export type Role =
   | "EMPLOYEE"
@@ -155,6 +168,26 @@ export const api = {
       unwrap<Record<string, unknown>>(
         apiClient.post(`/hod/appraisals/${id}/score`, data),
       ),
+    getFacultyRequests: () =>
+      unwrap<Record<string, unknown>[]>(apiClient.get("/hod/requests")),
+    getFacultyRequestById: (id: string) =>
+      unwrap<Record<string, unknown>>(apiClient.get(`/hod/requests/${id}`)),
+    submitFacultyReview: (
+      id: string,
+      payload: {
+        items: Array<{
+          itemId: string;
+          approvedPoints: number;
+          remark?: string;
+        }>;
+        additionalPoints?: number;
+        additionalPointsRemark?: string;
+        overallRemark?: string;
+      },
+    ) =>
+      unwrap<Record<string, unknown>>(
+        apiClient.put(`/hod/requests/${id}/review`, payload),
+      ),
   },
   committee: {
     getTeamAppraisals: () =>
@@ -177,6 +210,46 @@ export const api = {
       unwrap<Record<string, unknown>>(apiClient.get("/appraisal-cycles")),
     getSubmissions: () =>
       unwrap<Record<string, unknown>>(apiClient.get("/appraisals")),
+  },
+  departments: {
+    list: () => unwrap<DepartmentSummary[]>(apiClient.get("/departments")),
+  },
+  faculty: {
+    getProfile: () =>
+      unwrap<FacultyProfile>(apiClient.get("/faculty/profile")),
+    saveProfile: (data: FacultyProfilePayload) =>
+      unwrap<FacultyProfile>(apiClient.put("/faculty/profile", data)),
+    uploadImage: async (file: File) => {
+      const buffer = await file.arrayBuffer();
+      return unwrap<FacultyProfile>(
+        apiClient.post("/faculty/profile/image", buffer, {
+          headers: {
+            "Content-Type": file.type,
+          },
+        }),
+      );
+    },
+    getAppraisalPolicy: () =>
+      unwrap<FacultyAppraisalPolicy>(apiClient.get("/faculty/appraisal/policy")),
+    getAppraisalStatus: () =>
+      unwrap<FacultyAppraisalRequestStatus>(
+        apiClient.get("/faculty/appraisal/status"),
+      ),
+    uploadAppraisalEvidence: async (criterionKey: string, file: File) => {
+      const buffer = await file.arrayBuffer();
+      return unwrap<FacultyEvidenceUpload>(
+        apiClient.post(`/faculty/appraisal/evidence/${criterionKey}`, buffer, {
+          headers: {
+            "Content-Type": file.type,
+            "X-File-Name": file.name,
+          },
+        }),
+      );
+    },
+    submitAppraisalRequest: (payload: FacultyAppraisalRequestPayload) =>
+      unwrap<Record<string, unknown>>(
+        apiClient.post("/faculty/appraisal/request", payload),
+      ),
   },
 };
 

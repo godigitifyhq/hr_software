@@ -8,6 +8,8 @@ export interface AuthSession {
         firstName: string;
         lastName: string;
         roles: string[];
+        departmentId?: string | null;
+        department?: { id: string; name: string } | null;
     };
 }
 

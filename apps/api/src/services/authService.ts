@@ -30,7 +30,10 @@ type SessionBundle = {
     user: UserWithRoles;
 };
 
-type UserWithRoles = User & { roles: { role: RoleName }[] };
+type UserWithRoles = User & {
+    roles: { role: RoleName }[];
+    department?: { id: string; name: string } | null;
+};
 
 type RefreshClaims = {
     sub: string;
@@ -63,14 +66,24 @@ function getRefreshExpiry() {
 async function loadUserByEmail(email: string) {
     return prisma.user.findUnique({
         where: { email },
-        include: { roles: true }
+        include: {
+            roles: true,
+            department: {
+                select: { id: true, name: true }
+            }
+        }
     });
 }
 
 async function loadUserById(userId: string) {
     return prisma.user.findUnique({
         where: { id: userId },
-        include: { roles: true }
+        include: {
+            roles: true,
+            department: {
+                select: { id: true, name: true }
+            }
+        }
     });
 }
 

@@ -2,21 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@svgoi/zod-schemas";
 import { api } from "@/lib/api";
-import { getPrimaryRole, getRoleHomePath } from "@/lib/utils/routing";
+import { resolvePostLoginPath } from "@/lib/faculty-access";
 import { useAuthStore } from "@/store/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { session, isHydrated } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [createdMessage, setCreatedMessage] = useState(false);
 
   const {
     register,
@@ -27,12 +27,34 @@ export default function LoginPage() {
     defaultValues: { email: "", password: "" },
   });
 
-  const createdMessage = searchParams.get("created");
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    setCreatedMessage(params.get("created") === "1");
+  }, [isHydrated]);
 
   useEffect(() => {
-    if (isHydrated && session) {
-      router.replace(getRoleHomePath(getPrimaryRole(session.user.roles)));
+    let active = true;
+
+    async function redirectAuthenticatedUser() {
+      if (!isHydrated || !session) {
+        return;
+      }
+
+      const nextPath = await resolvePostLoginPath(session.user.roles);
+      if (active) {
+        router.replace(nextPath);
+      }
     }
+
+    void redirectAuthenticatedUser();
+
+    return () => {
+      active = false;
+    };
   }, [isHydrated, router, session]);
 
   const onSubmit = async (values: LoginInput) => {
@@ -44,7 +66,15 @@ export default function LoginPage() {
         accessToken: response.data.accessToken,
         user: response.data.user,
       });
-      router.push(getRoleHomePath(getPrimaryRole(response.data.user.roles)));
+      let nextPath = "/profile?complete=1";
+      try {
+        nextPath = await resolvePostLoginPath(response.data.user.roles);
+      } catch {
+        nextPath = response.data.user.roles.includes("FACULTY")
+          ? "/profile?complete=1"
+          : "/";
+      }
+      router.push(nextPath);
     } catch {
       setServerError("Invalid email or password. Please try again.");
     }
@@ -69,7 +99,8 @@ export default function LoginPage() {
           <div className="space-y-4">
             <p className="font-display text-4xl font-bold leading-tight text-white">
               Transparent appraisals.
-              <br />
+              <br /
+              >
               Meaningful growth.
             </p>
             <p className="max-w-lg text-base leading-7 text-slate-400">

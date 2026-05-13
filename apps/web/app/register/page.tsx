@@ -46,34 +46,12 @@ export default function RegisterPage() {
 
     async function loadDepartments() {
       try {
-        const response = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
-          }/departments`,
-          {
-            credentials: "include",
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error("Departments unavailable");
-        }
-
-        const payload = await response.json();
-        const list = Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload)
-          ? payload
-          : [];
+        const response = await api.departments.list();
+        const list = response.data ?? [];
 
         if (active) {
           setDepartments(
-            list
-              .map((item: { id?: string; name?: string }) => ({
-                id: item.id ?? "",
-                name: item.name ?? "",
-              }))
-              .filter((item: DepartmentOption) => item.id && item.name),
+            list.filter((item: DepartmentOption) => item.id && item.name),
           );
         }
       } catch {

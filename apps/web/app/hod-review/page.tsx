@@ -1,194 +1,218 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { apiClient } from '@/lib/api-client'
-import { useAuthStore } from '@/store/auth'
-import { formatDate } from '@/lib/date-utils'
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  CheckCircle2,
+  ClipboardCheck,
+  Loader2,
+  Users,
+} from "lucide-react";
+import { withAuth } from "@/components/auth/withAuth";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { api } from "@/lib/api";
+import { getPrimaryRole } from "@/lib/utils/routing";
+import { useAuthStore } from "@/store/auth";
 
-interface AppraisalForReview {
-  id: string
-  status: 'SUBMITTED' | 'HOD_REVIEW'
-  cycle: { name: string; startDate: string; endDate: string }
-  user: { id: string; email: string; firstName: string; lastName: string }
-  submittedAt?: string
-  createdAt: string
-}
+type HodRequestSummary = {
+  id: string;
+  status: string;
+  submittedAt?: string | null;
+  finalScore?: number | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    department?: { id: string; name: string } | null;
+  };
+  cycle: {
+    id: string;
+    name: string;
+  };
+  totalSelectedPoints: number;
+  itemsCount: number;
+};
 
-export default function HodReviewPage() {
-  const router = useRouter()
-  const { session, isHydrated } = useAuthStore()
-  const [appraisals, setAppraisals] = useState<AppraisalForReview[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+function HodDashboardPage() {
+  const { session } = useAuthStore();
+  const role = getPrimaryRole(session?.user.roles ?? []);
+  const [requests, setRequests] = useState<HodRequestSummary[]>([]);
+  const [selfStatus, setSelfStatus] = useState<{
+    hasRequest?: boolean;
+    status?: string;
+    totalPoints?: number | null;
+    incrementPercent?: number | null;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const { session, isHydrated } = useAuthStore.getState();
-    
-    if (!isHydrated) {
-      const unsubscribe = useAuthStore.subscribe(
-        (state) => {
-          if (state.isHydrated) {
-            if (!state.session) {
-              router.push('/login');
-            } else {
-              checkAccessAndFetch();
-            }
-            unsubscribe();
-          }
+    let active = true;
+
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        setError(null);
+        const [requestResponse, selfResponse] = await Promise.all([
+          api.hod.getFacultyRequests(),
+          api.faculty.getAppraisalStatus(),
+        ]);
+
+        if (!active) {
+          return;
         }
-      );
-      return;
-    }
-    
-    if (!session) {
-      router.push('/login');
-      return;
-    }
-    
-    checkAccessAndFetch();
-  }, [router])
 
-  async function checkAccessAndFetch() {
-    // Check if user has HOD role
-    if (!session?.user.roles.includes('HOD') && !session?.user.roles.includes('SUPER_ADMIN')) {
-      setError('Access denied. Only HODs or super admins can view this page.');
-      setLoading(false);
-      return;
+        setRequests((requestResponse.data ?? []) as HodRequestSummary[]);
+        setSelfStatus(selfResponse.data as any);
+      } catch (loadError: any) {
+        if (active) {
+          setError(
+            loadError?.response?.data?.message ||
+              loadError?.message ||
+              "Failed to load HOD dashboard",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     }
-    fetchAppraisals();
-  }
 
-  async function fetchAppraisals() {
-    try {
-      setLoading(true)
-      setError(null)
-      const { data } = await apiClient.get('/appraisals/hod/review-list')
-      setAppraisals(data.data || [])
-    } catch (err: any) {
-      const message = err?.response?.data?.message || 'Failed to load appraisals for review'
-      console.error('HOD review fetch error:', {
-        status: err?.response?.status,
-        message,
-        data: err?.response?.data
-      })
-      setError(message)
-      setAppraisals([])
-    } finally {
-      setLoading(false)
-    }
-  }
+    void loadDashboard();
 
-  const statusConfig = {
-    SUBMITTED: { label: 'Awaiting Review', color: 'bg-blue-100 text-blue-700' },
-    HOD_REVIEW: { label: 'In Review', color: 'bg-yellow-100 text-yellow-700' }
-  }
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const pendingCount = useMemo(
+    () => requests.filter((entry) => entry.status === "SUBMITTED").length,
+    [requests],
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-50">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <Link href="/" className="text-sm font-medium text-slate-600 hover:text-slate-900">
-              ← Back to Dashboard
-            </Link>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">HOD Review</h1>
-          </div>
-          <button
-            onClick={fetchAppraisals}
-            disabled={loading}
-            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50 disabled:opacity-60"
-          >
-            {loading ? 'Loading…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-medium text-red-800">{error}</p>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="text-center">
-              <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900"></div>
-              <p className="text-sm text-slate-600">Loading appraisals…</p>
+    <AppShell role={role}>
+      <PageHeader
+        title="HOD Dashboard"
+        subtitle="Review faculty appraisal requests and manage your own appraisal request."
+        actions={
+          selfStatus?.hasRequest ? (
+            <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-success/20 bg-success-bg px-4 text-sm font-medium text-success">
+              <CheckCircle2 className="h-4 w-4" />
+              Self Appraisal Requested
             </div>
-          </div>
-        ) : appraisals.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
-            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-              <svg
-                className="h-6 w-6 text-slate-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </div>
-            <h3 className="mb-2 text-lg font-semibold">No appraisals to review</h3>
-            <p className="mb-6 text-sm text-slate-600">
-              There are no appraisals pending HOD review at this time.
-            </p>
-            <button
-              onClick={fetchAppraisals}
-              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+          ) : (
+            <Link
+              href="/hod-review/request-appraisal"
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark"
             >
-              Try Again
-            </button>
+              Request Self Appraisal
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          )
+        }
+      />
+
+      {loading ? (
+        <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <div className="flex items-center gap-3 text-text-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Loading HOD dashboard...</span>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {appraisals.map((appraisal) => {
-              const status = statusConfig[appraisal.status]
-              return (
-                <Link
-                  key={appraisal.id}
-                  href={`/appraisals/${appraisal.id}`}
-                  className="block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          {appraisal.user.firstName} {appraisal.user.lastName}
-                        </h3>
-                        <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${status.color}`}>
-                          {status.label}
+        </div>
+      ) : (
+        <>
+          {error ? (
+            <div className="mb-6 rounded-2xl border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                Faculty Requests
+              </p>
+              <p className="mt-2 font-display text-3xl font-bold text-text">
+                {requests.length}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                Pending Review
+              </p>
+              <p className="mt-2 font-display text-3xl font-bold text-text">
+                {pendingCount}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                Your Self Request
+              </p>
+              <p className="mt-2 text-sm font-medium text-text">
+                {selfStatus?.hasRequest
+                  ? `${selfStatus.status} (${selfStatus.totalPoints ?? 0} pts)`
+                  : "Not submitted"}
+              </p>
+            </div>
+          </div>
+
+          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Users className="h-5 w-5 text-brand" />
+              <h2 className="font-display text-xl font-semibold text-text">
+                Faculty Appraisal Requests
+              </h2>
+            </div>
+
+            {requests.length === 0 ? (
+              <div className="rounded-xl border border-border bg-bg p-6 text-sm text-text-2">
+                No faculty appraisal requests are pending in your department.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {requests.map((request) => (
+                  <article
+                    key={request.id}
+                    className="rounded-xl border border-border bg-bg p-4"
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold text-text">
+                          {request.user.firstName} {request.user.lastName}
+                        </p>
+                        <p className="text-xs text-text-2">{request.user.email}</p>
+                        <p className="mt-1 text-xs text-text-3">
+                          {request.cycle.name} | {request.itemsCount} criteria |{" "}
+                          {request.totalSelectedPoints} selected points
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-brand-light px-3 py-1 text-xs font-semibold text-brand">
+                          {request.status}
                         </span>
-                      </div>
-                      <div className="mb-2 text-sm text-slate-600">
-                        <p>{appraisal.user.email}</p>
-                        <p className="text-xs">Cycle: {appraisal.cycle.name}</p>
-                      </div>
-                      <div className="flex gap-4 text-sm text-slate-600">
-                        <span>Submitted: {formatDate(appraisal.submittedAt || appraisal.createdAt)}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        Review
+                        <Link
+                          href={`/hod-review/review/${request.id}`}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text transition hover:bg-surface-2"
+                        >
+                          <ClipboardCheck className="h-4 w-4" />
+                          Review
+                        </Link>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        )}
-      </main>
-    </div>
-  )
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+    </AppShell>
+  );
 }
+
+export default withAuth(HodDashboardPage, ["HOD"]);

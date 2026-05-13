@@ -62,13 +62,13 @@ export default function HrDashboardPage() {
   }, [router]);
 
   async function checkAccessAndFetch() {
-    // Check if user has HR, ADMIN, or SUPER_ADMIN role
-    const allowedRoles = ["HR", "ADMIN", "SUPER_ADMIN"];
+    // Check if user has an HR-access role.
+    const allowedRoles = ["HR", "SUPER_ADMIN"];
     const hasAccess = allowedRoles.some((role) =>
       session?.user.roles.includes(role),
     );
     if (!hasAccess) {
-      setError("Access denied. Only HR staff or admins can view this page.");
+      setError("Access denied. Only HR staff or super admins can view this page.");
       setLoading(false);
       return;
     }

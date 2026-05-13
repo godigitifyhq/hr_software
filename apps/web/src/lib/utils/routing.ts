@@ -11,6 +11,10 @@ export type UiRole =
 
 export function getRoleHomePath(role: UiRole): string {
   switch (role) {
+    case "FACULTY":
+      return "/faculty-dashboard";
+    case "EMPLOYEE":
+      return "/employee-dashboard";
     case "HOD":
       return "/hod-review";
     case "COMMITTEE":
@@ -20,7 +24,6 @@ export function getRoleHomePath(role: UiRole): string {
     case "HR":
     case "ADMIN":
       return "/hr-dashboard";
-    case "EMPLOYEE":
     default:
       return "/appraisals";
   }
@@ -33,8 +36,8 @@ export function getPrimaryRole(roles: string[] = []): UiRole {
     "HR",
     "HOD",
     "COMMITTEE",
-    "EMPLOYEE",
     "FACULTY",
+    "EMPLOYEE",
     "MANAGEMENT",
   ];
   return priority.find((role) => roles.includes(role)) ?? "EMPLOYEE";

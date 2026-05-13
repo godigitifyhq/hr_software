@@ -257,4 +257,4 @@ function AppraisalDetailPage() {
   );
 }
 
-export default withAuth(AppraisalDetailPage, ["EMPLOYEE"]);
+export default withAuth(AppraisalDetailPage);

@@ -77,7 +77,9 @@ router.post('/login', async (req, res, next) => {
                     email: session.user.email,
                     firstName: session.user.firstName,
                     lastName: session.user.lastName,
-                    roles: session.user.roles.map((r: any) => r.role)
+                    roles: session.user.roles.map((r: any) => r.role),
+                    departmentId: session.user.departmentId,
+                    department: session.user.department
                 }
             }
         });
