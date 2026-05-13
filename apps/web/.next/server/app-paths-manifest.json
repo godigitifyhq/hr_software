@@ -1,0 +1,9 @@
+{
+  "/page": "app/page.js",
+  "/hr-dashboard/page": "app/hr-dashboard/page.js",
+  "/login/page": "app/login/page.js",
+  "/appraisals/[id]/page": "app/appraisals/[id]/page.js",
+  "/appraisals/page": "app/appraisals/page.js",
+  "/hod-review/page": "app/hod-review/page.js",
+  "/committee-review/page": "app/committee-review/page.js"
+}

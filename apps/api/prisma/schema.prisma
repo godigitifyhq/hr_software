@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  FACULTY
+  EMPLOYEE
+  HOD
+  COMMITTEE
+  HR
+  MANAGEMENT
+  SUPER_ADMIN
+}
+
+enum AppraisalStatus {
+  DRAFT
+  SUBMITTED
+  HOD_REVIEW
+  COMMITTEE_REVIEW
+  HR_FINALIZED
+  CLOSED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  phone         String?
+  departmentId  String?
+  department    Department? @relation("DepartmentUsers", fields: [departmentId], references: [id])
+  hodDepartment Department? @relation("DepartmentHod")
+  roles         UserRole[]
+  documents     Document[]
+  refreshTokens RefreshToken[]
+  loginAttempts LoginAttempt[]
+  passwordResetTokens PasswordResetToken[]
+  appraisals    Appraisal[]
+  memoDeductions MemoDeduction[]
+  committees    Committee[] @relation("CommitteeMembers")
+  auditLogs     AuditLog[]
+  publications  Publication[]
+  patents       Patent[]
+  consultancyGrants ConsultancyGrant[]
+  failedLoginCount Int       @default(0)
+  lockedUntil   DateTime?
+  passwordChangedAt DateTime? @default(now())
+  lastLoginAt   DateTime?
+  mustChangePassword Boolean @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+}
+
+model Department {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  code        String?
+  hodId       String?  @unique
+  hod         User?   @relation("DepartmentHod", fields: [hodId], references: [id])
+  users       User[]  @relation("DepartmentUsers")
+  placementStats PlacementStat[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+}
+
+model UserRole {
+  id     String   @id @default(uuid())
+  user   User     @relation(fields: [userId], references: [id])
+  userId String
+  role   RoleName
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model Document {
+  id         String   @id @default(uuid())
+  owner      User     @relation(fields: [ownerId], references: [id])
+  ownerId    String
+  name       String
+  mime       String
+  size       Int
+  driveId    String?  // reference to Google Drive file id
+  uploadedAt DateTime @default(now())
+  deletedAt  DateTime?
+}
+
+model RefreshToken {
+  id            String   @id @default(uuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+  tokenHash     String   @unique
+  familyId      String
+  jti           String   @unique
+  revokedAt     DateTime?
+  replacedById  String?
+  userAgent     String?
+  ipAddress     String?
+  createdAt     DateTime @default(now())
+  lastUsedAt    DateTime?
+  expiresAt     DateTime
+
+  @@index([userId, familyId])
+}
+
+model AppraisalCycle {
+  id          String   @id @default(uuid())
+  name        String
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  appraisals  Appraisal[]
+  memoDeductions MemoDeduction[]
+  placementStats PlacementStat[]
+}
+
+model Appraisal {
+  id             String         @id @default(uuid())
+  cycleId        String
+  cycle          AppraisalCycle @relation(fields: [cycleId], references: [id])
+  userId         String
+  user           User           @relation(fields: [userId], references: [id])
+  status         AppraisalStatus @default(DRAFT)
+  submittedAt    DateTime?
+  locked         Boolean         @default(false)
+  finalScore     Float?
+  finalPercent   Float?
+  hodRemarks     String?
+  committeeNotes String?
+  items          AppraisalItem[]
+  committeeAssignments CommitteeAssignment[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model AppraisalItem {
+  id            String   @id @default(uuid())
+  appraisal     Appraisal @relation(fields: [appraisalId], references: [id])
+  appraisalId   String
+  key           String   // e.g., "academics_average", "fdf_stp"
+  points        Int
+  weight        Float
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model ScoringConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  schemaJson  String   // JSON description of brackets and points
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MemoDeduction {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  cycleId   String
+  cycle     AppraisalCycle @relation(fields: [cycleId], references: [id])
+  count     Int
+  pointsDeducted Int
+  createdAt DateTime @default(now())
+}
+
+model LoginAttempt {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  email       String
+  ipAddress   String?
+  userAgent   String?
+  success     Boolean  @default(false)
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([userId, createdAt])
+}
+
+model PasswordResetToken {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Committee {
+  id        String   @id @default(uuid())
+  name      String
+  members   User[]   @relation("CommitteeMembers")
+  assignments CommitteeAssignment[]
+}
+
+model CommitteeAssignment {
+  id          String   @id @default(uuid())
+  committeeId String
+  committee   Committee @relation(fields: [committeeId], references: [id])
+  appraisalId String
+  appraisal   Appraisal @relation(fields: [appraisalId], references: [id])
+  assignedAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String
+  resource   String
+  resourceId String?
+  meta       String?
+  createdAt  DateTime @default(now())
+  immutable  Boolean  @default(true)
+}
+
+model Publication {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  title      String
+  journal    String?
+  scopus     Boolean  @default(false)
+  impactFactor Float?
+  createdAt  DateTime @default(now())
+}
+
+model Patent {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  type       String
+  granted    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model ConsultancyGrant {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  amount     Float
+  createdAt  DateTime @default(now())
+}
+
+model PlacementStat {
+  id         String   @id @default(uuid())
+  departmentId String
+  department Department @relation(fields: [departmentId], references: [id])
+  cycleId    String
+  cycle      AppraisalCycle @relation(fields: [cycleId], references: [id])
+  percent    Float
+  createdAt  DateTime @default(now())
+}
