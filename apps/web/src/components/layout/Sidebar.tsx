@@ -47,7 +47,12 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
   HOD: {
     title: "HOD",
     items: [
-      { label: "My Department", href: "/hod-review", icon: Building2 },
+      { label: "Dashboard", href: "/hod-review", icon: LayoutDashboard },
+      {
+        label: "Request Self Appraisal",
+        href: "/hod-review/request-appraisal",
+        icon: ClipboardList,
+      },
       { label: "My Profile", href: "/profile", icon: FileText },
     ],
   },

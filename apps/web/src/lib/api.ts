@@ -168,6 +168,26 @@ export const api = {
       unwrap<Record<string, unknown>>(
         apiClient.post(`/hod/appraisals/${id}/score`, data),
       ),
+    getFacultyRequests: () =>
+      unwrap<Record<string, unknown>[]>(apiClient.get("/hod/requests")),
+    getFacultyRequestById: (id: string) =>
+      unwrap<Record<string, unknown>>(apiClient.get(`/hod/requests/${id}`)),
+    submitFacultyReview: (
+      id: string,
+      payload: {
+        items: Array<{
+          itemId: string;
+          approvedPoints: number;
+          remark?: string;
+        }>;
+        additionalPoints?: number;
+        additionalPointsRemark?: string;
+        overallRemark?: string;
+      },
+    ) =>
+      unwrap<Record<string, unknown>>(
+        apiClient.put(`/hod/requests/${id}/review`, payload),
+      ),
   },
   committee: {
     getTeamAppraisals: () =>

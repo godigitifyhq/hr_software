@@ -16,7 +16,7 @@ import { withAuth } from "@/components/auth/withAuth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";
-import { userHasFacultyRole, userHasFacultyOrEmployeeRole } from "@/lib/faculty-access";
+import { userHasFacultyOrEmployeeRole } from "@/lib/faculty-access";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 
@@ -605,6 +605,7 @@ function ProfilePage() {
   const { session } = useAuthStore();
   const role = getPrimaryRole(session?.user.roles ?? []);
   const isFacultyOrEmployee = userHasFacultyOrEmployeeRole(session?.user.roles ?? []);
+  const isHod = (session?.user.roles ?? []).includes("HOD");
 
   return (
     <AppShell role={role}>
@@ -612,7 +613,9 @@ function ProfilePage() {
         title={isFacultyOrEmployee ? "Employee Profile" : "My Profile"}
         subtitle={
           isFacultyOrEmployee
-            ? "Complete and maintain your employee profile details."
+            ? isHod
+              ? "Complete and maintain your HOD profile details."
+              : "Complete and maintain your employee profile details."
             : "Review your account details and active role."
         }
       />

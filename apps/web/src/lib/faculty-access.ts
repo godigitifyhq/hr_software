@@ -4,7 +4,11 @@ import { api } from "@/lib/api";
 import { getPrimaryRole, getRoleHomePath } from "@/lib/utils/routing";
 
 export function userHasFacultyOrEmployeeRole(roles: string[] = []) {
-  return roles.includes("FACULTY") || roles.includes("EMPLOYEE");
+  return (
+    roles.includes("FACULTY") ||
+    roles.includes("EMPLOYEE") ||
+    roles.includes("HOD")
+  );
 }
 
 export function userHasFacultyRole(roles: string[] = []) {

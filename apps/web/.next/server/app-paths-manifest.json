@@ -1,7 +1,9 @@
 {
-  "/page": "app/page.js",
-  "/login/page": "app/login/page.js",
-  "/faculty-dashboard/page": "app/faculty-dashboard/page.js",
   "/profile/page": "app/profile/page.js",
-  "/faculty-dashboard/request-appraisal/page": "app/faculty-dashboard/request-appraisal/page.js"
+  "/hod-review/page": "app/hod-review/page.js",
+  "/hod-review/request-appraisal/page": "app/hod-review/request-appraisal/page.js",
+  "/faculty-dashboard/page": "app/faculty-dashboard/page.js",
+  "/faculty-dashboard/request-appraisal/page": "app/faculty-dashboard/request-appraisal/page.js",
+  "/register/page": "app/register/page.js",
+  "/login/page": "app/login/page.js"
 }
