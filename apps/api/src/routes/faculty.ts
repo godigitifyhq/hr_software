@@ -398,7 +398,6 @@ function getProfileUser(userId: string) {
       documents: {
         select: {
           id: true,
-          module: true,
           fieldKey: true,
           name: true,
           originalName: true,
@@ -758,9 +757,8 @@ router.post(
 
       await ensureEvidenceUploadDir();
       const sanitizedName = sanitizeFileName(originalFileName);
-      const fileName = `${userId}-${criterionKey}-${Date.now()}-${sanitizedName}${
-        path.extname(sanitizedName) ? "" : extension
-      }`;
+      const fileName = `${userId}-${criterionKey}-${Date.now()}-${sanitizedName}${path.extname(sanitizedName) ? "" : extension
+        }`;
       const filePath = path.join(getEvidenceUploadDir(), fileName);
       await fs.writeFile(filePath, body);
 
@@ -905,11 +903,10 @@ router.post(
         await transaction.appraisal.update({
           where: { id: appraisalId },
           data: {
-            status: "SUBMITTED",
+            // Send submitted requests to HOD for review first
+            status: "HOD_REVIEW",
             submittedAt: new Date(),
-            locked: true,
-            finalScore: totalPoints,
-            finalPercent: incrementPercent,
+            // finalScore/finalPercent and locked are set later by HR
           },
         });
       });
@@ -931,3 +928,223 @@ router.post(
 );
 
 export default router;
+
+// HOD review endpoint - HOD approves/rejects a submitted appraisal
+router.post(
+  "/appraisal/:id/hod-review",
+  authenticateRequest,
+  requireRoles("HOD", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const reviewerId = req.auth?.sub;
+      const appraisalId = req.params.id;
+      const { action } = req.body as { action?: string };
+
+      if (!action || (action !== "approve" && action !== "reject")) {
+        res
+          .status(400)
+          .json({ success: false, message: 'Provide action: "approve" or "reject"' });
+        return;
+      }
+
+      const appraisal = await prisma.appraisal.findUnique({
+        where: { id: appraisalId },
+        include: { user: { include: { department: true } } },
+      });
+      if (!appraisal) {
+        res.status(404).json({ success: false, message: "Appraisal not found" });
+        return;
+      }
+
+      // Ensure appraisal is pending HOD review
+      if (appraisal.status !== "HOD_REVIEW") {
+        res.status(400).json({ success: false, message: "Appraisal is not pending HOD review" });
+        return;
+      }
+
+      // Restrict to department HOD unless SUPER_ADMIN
+      const reviewerIsSuper = req.auth?.roles?.includes("SUPER_ADMIN");
+      const hodIdForUser = appraisal.user?.department?.hodId;
+      if (!reviewerIsSuper && reviewerId !== hodIdForUser) {
+        res.status(403).json({ success: false, message: "Only the department HOD can review this appraisal" });
+        return;
+      }
+
+      const comment = (req.body && (req.body as any).comment) || null;
+
+      if (action === "approve") {
+        await prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            status: "COMMITTEE_REVIEW",
+          },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            actorId: reviewerId ?? undefined,
+            action: "APPRAISAL_HOD_APPROVE",
+            resource: "Appraisal",
+            resourceId: appraisalId,
+            meta: JSON.stringify({ comment, previousStatus: appraisal.status, newStatus: "COMMITTEE_REVIEW" }),
+          },
+        });
+
+        res.json({ success: true, message: "Appraisal approved and forwarded to committee" });
+        return;
+      }
+
+      // reject -> revert to DRAFT so faculty can edit/resubmit
+      await prisma.appraisal.update({
+        where: { id: appraisalId },
+        data: {
+          status: "DRAFT",
+          locked: false,
+          submittedAt: null,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: reviewerId ?? undefined,
+          action: "APPRAISAL_HOD_REJECT",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: JSON.stringify({ comment, previousStatus: appraisal.status, newStatus: "DRAFT" }),
+        },
+      });
+
+      res.json({ success: true, message: "Appraisal rejected and reverted to draft" });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Committee review endpoint
+router.post(
+  "/appraisal/:id/committee-review",
+  authenticateRequest,
+  requireRoles("COMMITTEE", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const appraisalId = req.params.id;
+      const { action } = req.body as { action?: string };
+
+      if (!action || (action !== "approve" && action !== "reject")) {
+        res
+          .status(400)
+          .json({ success: false, message: 'Provide action: "approve" or "reject"' });
+        return;
+      }
+
+      const appraisal = await prisma.appraisal.findUnique({ where: { id: appraisalId } });
+      if (!appraisal) {
+        res.status(404).json({ success: false, message: "Appraisal not found" });
+        return;
+      }
+
+      if (appraisal.status !== "COMMITTEE_REVIEW") {
+        res.status(400).json({ success: false, message: "Appraisal is not pending committee review" });
+        return;
+      }
+
+      if (action === "approve") {
+        await prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            status: "HR_FINALIZED",
+          },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            actorId: req.auth?.sub ?? undefined,
+            action: "APPRAISAL_COMMITTEE_APPROVE",
+            resource: "Appraisal",
+            resourceId: appraisalId,
+            meta: JSON.stringify({ comment: (req.body as any)?.comment ?? null, previousStatus: appraisal.status, newStatus: "HR_FINALIZED" }),
+          },
+        });
+
+        res.json({ success: true, message: "Appraisal approved and forwarded to HR" });
+        return;
+      }
+
+      // reject -> revert to DRAFT
+      await prisma.appraisal.update({
+        where: { id: appraisalId },
+        data: {
+          status: "DRAFT",
+          locked: false,
+          submittedAt: null,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: req.auth?.sub ?? undefined,
+          action: "APPRAISAL_COMMITTEE_REJECT",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: JSON.stringify({ comment: (req.body as any)?.comment ?? null, previousStatus: appraisal.status, newStatus: "DRAFT" }),
+        },
+      });
+
+      res.json({ success: true, message: "Appraisal rejected and reverted to draft" });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// HR finalize endpoint - HR sets final score/percent and closes the appraisal
+router.post(
+  "/appraisal/:id/hr-finalize",
+  authenticateRequest,
+  requireRoles("HR", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const appraisalId = req.params.id;
+      const { finalScore, finalPercent } = req.body as {
+        finalScore?: number;
+        finalPercent?: number;
+      };
+
+      const appraisal = await prisma.appraisal.findUnique({ where: { id: appraisalId } });
+      if (!appraisal) {
+        res.status(404).json({ success: false, message: "Appraisal not found" });
+        return;
+      }
+
+      if (appraisal.status !== "HR_FINALIZED") {
+        res.status(400).json({ success: false, message: "Appraisal is not pending HR finalization" });
+        return;
+      }
+
+      await prisma.appraisal.update({
+        where: { id: appraisalId },
+        data: {
+          status: "CLOSED",
+          locked: true,
+          finalScore: finalScore ?? appraisal.finalScore,
+          finalPercent: finalPercent ?? appraisal.finalPercent,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          actorId: req.auth?.sub ?? undefined,
+          action: "APPRAISAL_HR_FINALIZE",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: JSON.stringify({ finalScore: finalScore ?? appraisal.finalScore, finalPercent: finalPercent ?? appraisal.finalPercent }),
+        },
+      });
+
+      res.json({ success: true, message: "Appraisal finalized by HR" });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
