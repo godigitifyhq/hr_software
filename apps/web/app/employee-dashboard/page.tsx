@@ -26,8 +26,66 @@ function getImageSrc(imageUrl: string | null | undefined) {
   if (!imageUrl) {
     return null;
   }
+  const toDriveProxy = (url: string) => {
+    try {
+      const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      const q = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      const fileId = m?.[1] ?? q?.[1];
+      if (!fileId) return url;
 
-  return imageUrl.startsWith("http") ? imageUrl : `${API_ORIGIN}${imageUrl}`;
+      if (typeof window !== "undefined") {
+        try {
+          const apiOrigin = new URL(API_ORIGIN).origin;
+          if (apiOrigin !== window.location.origin) {
+            return `${API_ORIGIN}/api/v1/drive/${fileId}`;
+          }
+        } catch {
+          // fall through to return original url
+        }
+      }
+
+      return `${API_ORIGIN}/api/v1/drive/${fileId}`;
+    } catch (e) {
+      return url;
+    }
+  };
+
+  const toDriveDirect = (url: string) => {
+    try {
+      if (
+        url.includes("drive.google.com/uc") ||
+        url.includes("lh3.googleusercontent.com")
+      ) {
+        const q = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (q && q[1]) {
+          const direct = `https://drive.google.com/uc?export=view&id=${q[1]}`;
+          return toDriveProxy(direct);
+        }
+        const normalized = url.replace("export=download", "export=view");
+        return toDriveProxy(normalized);
+      }
+
+      const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (m && m[1]) {
+        return toDriveProxy(
+          `https://drive.google.com/uc?export=view&id=${m[1]}`,
+        );
+      }
+      const q2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (q2 && q2[1]) {
+        return toDriveProxy(
+          `https://drive.google.com/uc?export=view&id=${q2[1]}`,
+        );
+      }
+      return url;
+    } catch (e) {
+      return url;
+    }
+  };
+
+  return imageUrl.startsWith("http")
+    ? toDriveDirect(imageUrl)
+    : `${API_ORIGIN}${imageUrl}`;
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -240,7 +298,9 @@ function EmployeeDashboardContent() {
                 PAN
               </p>
               <p className="mt-1 text-sm text-text">
-                {profile?.pan ? `${profile.pan.substring(0, 5)}****` : "Not provided"}
+                {profile?.pan
+                  ? `${profile.pan.substring(0, 5)}****`
+                  : "Not provided"}
               </p>
             </div>
 
@@ -300,7 +360,9 @@ function EmployeeDashboardContent() {
                 10th Marks
               </p>
               <p className="mt-1 text-sm text-text">
-                {profile?.tenthMarks ? `${profile.tenthMarks}%` : "Not provided"}
+                {profile?.tenthMarks
+                  ? `${profile.tenthMarks}%`
+                  : "Not provided"}
               </p>
             </div>
 
@@ -310,7 +372,9 @@ function EmployeeDashboardContent() {
                 12th Marks
               </p>
               <p className="mt-1 text-sm text-text">
-                {profile?.twelfthMarks ? `${profile.twelfthMarks}%` : "Not provided"}
+                {profile?.twelfthMarks
+                  ? `${profile.twelfthMarks}%`
+                  : "Not provided"}
               </p>
             </div>
 
@@ -340,7 +404,9 @@ function EmployeeDashboardContent() {
                 <p className="text-xs font-medium uppercase tracking-wider text-text-3">
                   Post Graduation
                 </p>
-                <p className="mt-1 text-sm text-text">{profile.postGraduation}</p>
+                <p className="mt-1 text-sm text-text">
+                  {profile.postGraduation}
+                </p>
               </div>
             )}
 
@@ -365,7 +431,9 @@ function EmployeeDashboardContent() {
             <Award className="h-5 w-5 text-blue" />
             <div>
               <p className="font-semibold text-text">View Appraisals</p>
-              <p className="text-xs text-text-2">Check your appraisal submissions</p>
+              <p className="text-xs text-text-2">
+                Check your appraisal submissions
+              </p>
             </div>
           </Link>
 
@@ -376,7 +444,9 @@ function EmployeeDashboardContent() {
             <FileText className="h-5 w-5 text-green" />
             <div>
               <p className="font-semibold text-text">Update Profile</p>
-              <p className="text-xs text-text-2">Keep your information current</p>
+              <p className="text-xs text-text-2">
+                Keep your information current
+              </p>
             </div>
           </Link>
         </section>

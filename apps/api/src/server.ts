@@ -13,6 +13,7 @@ import adminRouter from "./routes/admin";
 import facultyRouter from "./routes/faculty";
 import departmentsRouter from "./routes/departments";
 import uploadsRouter from "./routes/uploads";
+import driveRouter from "./routes/drive";
 
 dotenv.config();
 
@@ -73,6 +74,7 @@ app.use("/api/v1/hod", hodRouter);
 app.use("/api/v1/hr", hrRouter);
 app.use("/api/v1/appraisals", appraisalsRouter);
 app.use("/api/v1/uploads", uploadsRouter);
+app.use("/api/v1/drive", driveRouter);
 
 // Basic error handler
 app.use(

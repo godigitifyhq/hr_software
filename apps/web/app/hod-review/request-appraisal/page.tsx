@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CheckCircle2,
+  ExternalLink,
   Loader2,
   SendHorizontal,
   Upload,
@@ -12,6 +13,7 @@ import {
 import { withAuth } from "@/components/auth/withAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ConfirmDialog } from "@/components/ui";
 import { api } from "@/lib/api";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
@@ -28,6 +30,11 @@ type CriterionState = {
   evidence: FacultyEvidenceUpload | null;
 };
 
+type PendingUpload = {
+  criterionKey: string;
+  file: File;
+};
+
 function HodSelfRequestPage() {
   const { session } = useAuthStore();
   const role = getPrimaryRole(session?.user.roles ?? []);
@@ -42,6 +49,10 @@ function HodSelfRequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(
+    null,
+  );
+  const [confirmUploadOpen, setConfirmUploadOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -96,7 +107,8 @@ function HodSelfRequestPage() {
   }, []);
 
   const totalPoints = useMemo(
-    () => Object.values(criteriaState).reduce((sum, item) => sum + item.points, 0),
+    () =>
+      Object.values(criteriaState).reduce((sum, item) => sum + item.points, 0),
     [criteriaState],
   );
 
@@ -117,19 +129,27 @@ function HodSelfRequestPage() {
 
     const bracket = policy.incrementBrackets.find((entry) => {
       const lower = totalPoints >= entry.min;
-      const upper = typeof entry.max === "number" ? totalPoints <= entry.max : true;
+      const upper =
+        typeof entry.max === "number" ? totalPoints <= entry.max : true;
       return lower && upper;
     });
     return bracket?.incrementPercent ?? 0;
   }, [policy, totalPoints]);
 
-  function updateCriterionSelection(criterionKey: string, selectedValue: string) {
+  function updateCriterionSelection(
+    criterionKey: string,
+    selectedValue: string,
+  ) {
     if (!policy) {
       return;
     }
 
-    const criterion = policy.criteria.find((entry) => entry.key === criterionKey);
-    const option = criterion?.options.find((entry) => entry.value === selectedValue);
+    const criterion = policy.criteria.find(
+      (entry) => entry.key === criterionKey,
+    );
+    const option = criterion?.options.find(
+      (entry) => entry.value === selectedValue,
+    );
 
     setCriteriaState((current) => ({
       ...current,
@@ -164,7 +184,10 @@ function HodSelfRequestPage() {
     }));
 
     try {
-      const response = await api.faculty.uploadAppraisalEvidence(criterionKey, file);
+      const response = await api.faculty.uploadAppraisalEvidence(
+        criterionKey,
+        file,
+      );
       setCriteriaState((current) => ({
         ...current,
         [criterionKey]: {
@@ -218,6 +241,18 @@ function HodSelfRequestPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function confirmPendingUpload() {
+    if (!pendingUpload) {
+      setConfirmUploadOpen(false);
+      return;
+    }
+
+    const upload = pendingUpload;
+    setPendingUpload(null);
+    setConfirmUploadOpen(false);
+    await uploadEvidence(upload.criterionKey, upload.file);
   }
 
   if (loading) {
@@ -326,8 +361,12 @@ function HodSelfRequestPage() {
                       </label>
                       <select
                         value={state?.selectedValue || ""}
+                        aria-label={`${criterion.heading} criteria`}
                         onChange={(event) =>
-                          updateCriterionSelection(criterion.key, event.target.value)
+                          updateCriterionSelection(
+                            criterion.key,
+                            event.target.value,
+                          )
                         }
                         className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
                       >
@@ -346,7 +385,9 @@ function HodSelfRequestPage() {
                           ) : (
                             <Upload className="h-4 w-4" />
                           )}
-                          {state?.uploading ? "Uploading..." : "Upload evidence"}
+                          {state?.uploading
+                            ? "Uploading..."
+                            : "Upload evidence"}
                           <input
                             type="file"
                             accept="image/jpeg,image/png,application/pdf"
@@ -354,7 +395,11 @@ function HodSelfRequestPage() {
                             onChange={(event) => {
                               const file = event.target.files?.[0];
                               if (file) {
-                                void uploadEvidence(criterion.key, file);
+                                setPendingUpload({
+                                  criterionKey: criterion.key,
+                                  file,
+                                });
+                                setConfirmUploadOpen(true);
                               }
                               event.target.value = "";
                             }}
@@ -364,9 +409,29 @@ function HodSelfRequestPage() {
                           JPG, PNG, or PDF. Max 5MB.
                         </p>
                         {state?.evidence ? (
-                          <p className="mt-2 text-xs text-success">
-                            Uploaded: {state.evidence.fileName}
-                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                            <p className="text-success">
+                              Uploaded: {state.evidence.fileName}
+                            </p>
+                            {(state.evidence.viewUrl ||
+                              state.evidence.url ||
+                              state.evidence.directUrl) && (
+                              <a
+                                href={
+                                  state.evidence.viewUrl ||
+                                  state.evidence.url ||
+                                  state.evidence.directUrl ||
+                                  "#"
+                                }
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 font-semibold text-brand hover:text-brand-dark"
+                              >
+                                View file
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
                         ) : null}
                       </div>
                     </div>
@@ -408,6 +473,24 @@ function HodSelfRequestPage() {
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmUploadOpen}
+        title="Confirm evidence upload"
+        description={
+          pendingUpload
+            ? `Upload ${pendingUpload.file.name} for this criterion? This file will be shared with reviewers.`
+            : "Upload this evidence file?"
+        }
+        confirmLabel="Upload file"
+        onCancel={() => {
+          setConfirmUploadOpen(false);
+          setPendingUpload(null);
+        }}
+        onConfirm={() => {
+          void confirmPendingUpload();
+        }}
+      />
     </AppShell>
   );
 }

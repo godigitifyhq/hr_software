@@ -1,13 +1,10 @@
 import express from "express";
 import multer from "multer";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import type { AuthenticatedRequest } from "../middleware/rbac";
 import { authenticateRequest, requireRoles } from "../middleware/rbac";
 import { prisma } from "../lib/prisma";
-import { uploadBufferToDrive } from "../lib/googleDrive";
+import { uploadBufferViaAppsScript } from "../lib/googleDrive";
 import {
   APPRAISAL_EVIDENCE_UPLOAD_MODULE,
   buildUploadResponse,
@@ -29,36 +26,6 @@ const upload = multer({
 });
 
 const uploadSingle = upload.single("file");
-
-function sanitizeFileName(value: string) {
-  return value.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-async function saveFileToLocalUploads(input: {
-  moduleName: string;
-  ownerId: string;
-  originalName: string;
-  buffer: Buffer;
-}) {
-  const cleanName = sanitizeFileName(input.originalName || "upload.bin");
-  const uniqueName = `${Date.now()}-${randomUUID()}-${cleanName}`;
-  const relativeDir = path.join("uploads", input.moduleName, input.ownerId);
-  const absoluteDir = path.join(process.cwd(), relativeDir);
-  await fs.mkdir(absoluteDir, { recursive: true });
-
-  const relativePath = path.join(relativeDir, uniqueName);
-  const absolutePath = path.join(process.cwd(), relativePath);
-  await fs.writeFile(absolutePath, input.buffer);
-
-  const webPath = `/${relativePath.split(path.sep).join("/")}`;
-
-  return {
-    fileId: uniqueName,
-    folderId: `local:${input.moduleName}/${input.ownerId}`,
-    viewUrl: webPath,
-    directUrl: webPath,
-  };
-}
 
 function runUploadMiddleware(
   req: express.Request,
@@ -118,6 +85,26 @@ function parseMetadata(rawValue: unknown) {
   } catch {
     return null;
   }
+}
+
+function resolveGoogleDriveFolder(moduleName: string) {
+  if (moduleName === APPRAISAL_EVIDENCE_UPLOAD_MODULE) {
+    return (
+      process.env.GOOGLE_DRIVE_APPRAISAL_FOLDER_ID ||
+      process.env.GOOGLE_DRIVE_FOLDER_ID ||
+      undefined
+    );
+  }
+
+  if (moduleName === "faculty-profile") {
+    return (
+      process.env.GOOGLE_DRIVE_FACULTY_FOLDER_ID ||
+      process.env.GOOGLE_DRIVE_FOLDER_ID ||
+      undefined
+    );
+  }
+
+  return process.env.GOOGLE_DRIVE_FOLDER_ID || undefined;
 }
 
 router.post(
@@ -213,29 +200,18 @@ router.post(
           : validation.label;
       const originalName = file.originalname || displayName;
 
-      const uploaded =
-        moduleName === "faculty-profile"
-          ? await saveFileToLocalUploads({
-              moduleName,
-              ownerId: userId,
-              originalName,
-              buffer: file.buffer,
-            })
-          : await uploadBufferToDrive({
-              fileName: originalName,
-              mimeType: file.mimetype,
-              buffer: file.buffer,
-              folderId:
-                moduleName === APPRAISAL_EVIDENCE_UPLOAD_MODULE
-                  ? process.env.GOOGLE_DRIVE_APPRAISAL_FOLDER_ID || undefined
-                  : process.env.GOOGLE_DRIVE_FOLDER_ID || undefined,
-              description: `${moduleName}:${fieldKey}`,
-              appProperties: {
-                module: moduleName,
-                fieldKey,
-                ownerId: userId,
-              },
-            });
+      const uploaded = await uploadBufferViaAppsScript({
+        fileName: originalName,
+        mimeType: file.mimetype,
+        buffer: file.buffer,
+        folderId: resolveGoogleDriveFolder(moduleName),
+        description: `${moduleName}:${fieldKey}`,
+        appProperties: {
+          module: moduleName,
+          fieldKey,
+          ownerId: userId,
+        },
+      });
 
       const saved = await upsertUploadedDocument({
         ownerId: userId,
@@ -246,15 +222,14 @@ router.post(
         mime: file.mimetype,
         size: file.size,
         drive: {
-          driveFileId: uploaded.fileId,
+          driveFileId: uploaded.driveFileId,
           viewUrl: uploaded.viewUrl,
           directUrl: uploaded.directUrl,
           folderId: uploaded.folderId,
           mimeType: file.mimetype,
           fileName: originalName,
         },
-        storageProvider:
-          moduleName === "faculty-profile" ? "local" : "google-drive",
+        storageProvider: "google-drive",
         metadataJson: metadata ?? undefined,
       });
 

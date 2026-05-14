@@ -58,6 +58,43 @@ const DATE_FIELDS = new Set([
   "updatedAt",
 ]);
 
+function toDriveProxy(url: string) {
+  try {
+    const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    const q = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    const fileId = m?.[1] ?? q?.[1];
+    if (!fileId) return url;
+    return `${API_ORIGIN}/api/v1/drive/${fileId}`;
+  } catch {
+    return url;
+  }
+}
+
+function normalizeDriveUrl(value: string) {
+  if (
+    value.includes("drive.google.com/uc") ||
+    value.includes("lh3.googleusercontent.com")
+  ) {
+    const q = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (q && q[1]) {
+      return toDriveProxy(`https://drive.google.com/uc?export=view&id=${q[1]}`);
+    }
+    const normalized = value.replace("export=download", "export=view");
+    return toDriveProxy(normalized);
+  }
+
+  const m = value.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m && m[1]) {
+    return toDriveProxy(`https://drive.google.com/uc?export=view&id=${m[1]}`);
+  }
+  const q2 = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (q2 && q2[1]) {
+    return toDriveProxy(`https://drive.google.com/uc?export=view&id=${q2[1]}`);
+  }
+
+  return value;
+}
+
 function formatProfileLabel(key: string) {
   return (
     PROFILE_LABELS[key] ??
@@ -77,7 +114,10 @@ function formatProfileValue(key: string, value: unknown) {
     return value.toString();
   }
   if (key === "imageUrl" && typeof value === "string") {
-    return value.startsWith("http") ? value : `${API_ORIGIN}${value}`;
+    if (value.startsWith("http")) {
+      return normalizeDriveUrl(value);
+    }
+    return `${API_ORIGIN}${value}`;
   }
   return String(value);
 }

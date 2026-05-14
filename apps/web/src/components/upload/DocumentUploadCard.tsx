@@ -18,6 +18,8 @@ import type {
   UploadProgressSnapshot,
   UploadedDocumentResponse,
 } from "@/lib/api";
+import { API_ORIGIN } from "@/lib/api-client";
+import { ConfirmDialog } from "@/components/ui";
 
 type DocumentUploadCardProps = {
   config: FacultyDocumentUploadConfig;
@@ -63,6 +65,43 @@ function toReadableMime(mime: string) {
   }
 }
 
+function toDriveProxy(url: string) {
+  try {
+    const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    const q = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    const fileId = m?.[1] ?? q?.[1];
+    if (!fileId) return url;
+    return `${API_ORIGIN}/api/v1/drive/${fileId}`;
+  } catch {
+    return url;
+  }
+}
+
+function normalizeDriveUrl(value: string) {
+  if (
+    value.includes("drive.google.com/uc") ||
+    value.includes("lh3.googleusercontent.com")
+  ) {
+    const q = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (q && q[1]) {
+      return toDriveProxy(`https://drive.google.com/uc?export=view&id=${q[1]}`);
+    }
+    const normalized = value.replace("export=download", "export=view");
+    return toDriveProxy(normalized);
+  }
+
+  const m = value.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m && m[1]) {
+    return toDriveProxy(`https://drive.google.com/uc?export=view&id=${m[1]}`);
+  }
+  const q2 = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (q2 && q2[1]) {
+    return toDriveProxy(`https://drive.google.com/uc?export=view&id=${q2[1]}`);
+  }
+
+  return value;
+}
+
 export function DocumentUploadCard({
   config,
   document,
@@ -77,6 +116,8 @@ export function DocumentUploadCard({
   >(document ? "success" : "idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [confirmUploadOpen, setConfirmUploadOpen] = useState(false);
 
   const allowImagePreview = useMemo(() => {
     const mime = document?.mime ?? selectedFile?.type ?? "";
@@ -85,6 +126,12 @@ export function DocumentUploadCard({
 
   const previewUrl = document?.directUrl ?? document?.viewUrl ?? null;
   const uploadedUrl = document?.viewUrl ?? document?.directUrl ?? null;
+  const normalizedPreviewUrl = previewUrl
+    ? normalizeDriveUrl(previewUrl)
+    : null;
+  const normalizedUploadedUrl = uploadedUrl
+    ? normalizeDriveUrl(uploadedUrl)
+    : null;
   const currentLabel = document?.name || config.label;
   const acceptedFormats = config.accept.map(toReadableMime).join(" / ");
 
@@ -143,8 +190,21 @@ export function DocumentUploadCard({
       return;
     }
 
-    await startUpload(file);
+    setPendingFile(file);
+    setConfirmUploadOpen(true);
     event.target.value = "";
+  }
+
+  async function confirmUpload() {
+    if (!pendingFile) {
+      setConfirmUploadOpen(false);
+      return;
+    }
+
+    const fileToUpload = pendingFile;
+    setPendingFile(null);
+    setConfirmUploadOpen(false);
+    await startUpload(fileToUpload);
   }
 
   return (
@@ -218,10 +278,10 @@ export function DocumentUploadCard({
         </button>
 
         <div className="flex min-w-[14rem] flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
-          {allowImagePreview && previewUrl ? (
+          {allowImagePreview && normalizedPreviewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={previewUrl}
+              src={normalizedPreviewUrl}
               alt={config.label}
               className="h-28 w-full rounded-xl object-cover"
             />
@@ -238,9 +298,9 @@ export function DocumentUploadCard({
             </div>
           )}
 
-          {uploadedUrl ? (
+          {normalizedUploadedUrl ? (
             <a
-              href={uploadedUrl}
+              href={normalizedUploadedUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-medium text-text transition hover:bg-surface"
@@ -300,8 +360,28 @@ export function DocumentUploadCard({
         ref={inputRef}
         type="file"
         accept={config.accept.join(",")}
+        title={`Upload ${config.label}`}
+        aria-label={`Upload ${config.label}`}
         className="hidden"
         onChange={handleInputChange}
+      />
+
+      <ConfirmDialog
+        open={confirmUploadOpen}
+        title="Confirm upload"
+        description={
+          pendingFile
+            ? `Upload ${pendingFile.name} for ${config.label}?`
+            : `Upload file for ${config.label}?`
+        }
+        confirmLabel="Upload file"
+        onCancel={() => {
+          setConfirmUploadOpen(false);
+          setPendingFile(null);
+        }}
+        onConfirm={() => {
+          void confirmUpload();
+        }}
       />
     </section>
   );
