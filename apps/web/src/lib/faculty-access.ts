@@ -4,11 +4,7 @@ import { api } from "@/lib/api";
 import { getPrimaryRole, getRoleHomePath } from "@/lib/utils/routing";
 
 export function userHasFacultyOrEmployeeRole(roles: string[] = []) {
-  return (
-    roles.includes("FACULTY") ||
-    roles.includes("EMPLOYEE") ||
-    roles.includes("HOD")
-  );
+  return roles.includes("FACULTY") || roles.includes("EMPLOYEE");
 }
 
 export function userHasFacultyRole(roles: string[] = []) {
@@ -16,7 +12,9 @@ export function userHasFacultyRole(roles: string[] = []) {
 }
 
 function canBypassFacultyGate(pathname: string) {
-  return pathname.startsWith("/profile") || pathname.startsWith("/unauthorized");
+  return (
+    pathname.startsWith("/profile") || pathname.startsWith("/unauthorized")
+  );
 }
 
 export async function resolvePostLoginPath(roles: string[] = []) {

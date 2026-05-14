@@ -25,7 +25,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DocumentUploadCard } from "@/components/upload/DocumentUploadCard";
 import { api } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";
-import { userHasFacultyOrEmployeeRole } from "@/lib/faculty-access";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 
@@ -121,8 +120,21 @@ function FacultyProfileSection() {
   });
 
   useEffect(() => {
-    if (session && !userHasFacultyOrEmployeeRole(session.user.roles)) {
-      router.replace("/unauthorized");
+    const canAccessProfile =
+      session?.user.roles.includes("FACULTY") ||
+      session?.user.roles.includes("EMPLOYEE") ||
+      session?.user.roles.includes("HOD") ||
+      session?.user.roles.includes("COMMITTEE") ||
+      session?.user.roles.includes("HR") ||
+      session?.user.roles.includes("MANAGEMENT") ||
+      session?.user.roles.includes("ADMIN") ||
+      session?.user.roles.includes("SUPER_ADMIN");
+
+    if (session && !canAccessProfile) {
+      const current = encodeURIComponent(session.user.roles.join(","));
+      router.replace(
+        `/unauthorized?reason=profile-role&required=FACULTY,EMPLOYEE,HOD,COMMITTEE,HR,MANAGEMENT,ADMIN,SUPER_ADMIN&current=${current}&path=%2Fprofile`,
+      );
     }
   }, [router, session]);
 
@@ -441,12 +453,11 @@ function FacultyProfileSection() {
                     <span>Uploading</span>
                     <span>{imageUploadProgress}%</span>
                   </div>
-                  <div className="h-2 rounded-full bg-surface-2">
-                    <div
-                      className="h-2 rounded-full bg-brand transition-all"
-                      style={{ width: `${imageUploadProgress}%` }}
-                    />
-                  </div>
+                  <progress
+                    className="h-2 w-full overflow-hidden rounded-full bg-surface-2 [appearance:none] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface-2 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-brand [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-brand"
+                    value={imageUploadProgress}
+                    max={100}
+                  />
                 </div>
               ) : null}
 
@@ -714,4 +725,13 @@ function FacultyProfileSection() {
   );
 }
 
-export default withAuth(FacultyProfileSection, ["FACULTY", "EMPLOYEE"]);
+export default withAuth(FacultyProfileSection, [
+  "FACULTY",
+  "EMPLOYEE",
+  "HOD",
+  "COMMITTEE",
+  "HR",
+  "MANAGEMENT",
+  "ADMIN",
+  "SUPER_ADMIN",
+]);

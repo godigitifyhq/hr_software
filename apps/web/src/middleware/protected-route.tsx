@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import React, { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store/auth';
-import { useEffect, useState } from 'react';
+import React, { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth";
+import { useEffect, useState } from "react";
 
 export function ProtectedRoute({
   children,
-  requiredRoles = []
+  requiredRoles = [],
 }: {
   children: ReactNode;
   requiredRoles?: string[];
@@ -18,14 +18,18 @@ export function ProtectedRoute({
 
   useEffect(() => {
     if (!session) {
-      router.push('/login');
+      router.push("/login");
       return;
     }
 
     if (requiredRoles.length > 0) {
-      const hasPermission = requiredRoles.some(role => hasRole(role));
+      const hasPermission = requiredRoles.some((role) => hasRole(role));
       if (!hasPermission) {
-        router.push('/unauthorized');
+        const required = encodeURIComponent(requiredRoles.join(","));
+        const current = encodeURIComponent(session.user.roles.join(","));
+        router.push(
+          `/unauthorized?reason=missing-role&required=${required}&current=${current}`,
+        );
         return;
       }
     }

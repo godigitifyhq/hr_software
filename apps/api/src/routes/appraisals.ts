@@ -1,11 +1,11 @@
 import express from "express";
+import { z } from "zod";
 import {
   authenticateRequest,
   AuthenticatedRequest,
   requireRoles,
 } from "../middleware/rbac";
 import { prisma } from "../lib/prisma";
-import { z } from "zod";
 import { writeAuditLog } from "../lib/audit";
 
 const router: express.Router = express.Router();
@@ -46,10 +46,11 @@ function computeFinalScores(items: AppraisalItemInput[]) {
   const weightedAverage =
     items.reduce((sum, item) => sum + item.points * item.weight, 0) /
     totalWeight;
-  const finalScore = Number(weightedAverage.toFixed(2));
-  const finalPercent = Number(((weightedAverage / 4) * 100).toFixed(1));
 
-  return { finalScore, finalPercent };
+  return {
+    finalScore: Number(weightedAverage.toFixed(2)),
+    finalPercent: Number(((weightedAverage / 4) * 100).toFixed(1)),
+  };
 }
 
 async function getAppraisalOr404(appraisalId: string) {
@@ -110,6 +111,10 @@ async function canViewAppraisal(
   }
 
   if (roles.includes("COMMITTEE")) {
+    if (["COMMITTEE_REVIEW", "HR_FINALIZED"].includes(appraisal.status)) {
+      return true;
+    }
+
     return appraisal.committeeAssignments.some((assignment) =>
       assignment.committee.members.some((member) => member.id === userId),
     );
@@ -117,6 +122,7 @@ async function canViewAppraisal(
 
   return false;
 }
+
 router.get(
   "/hr/dashboard",
   authenticateRequest,
@@ -205,7 +211,13 @@ router.get(
             },
           },
           user: {
-            select: { id: true, email: true, firstName: true, lastName: true },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              department: { select: { id: true, name: true } },
+            },
           },
         },
         orderBy: { submittedAt: "desc" },
@@ -236,18 +248,39 @@ router.get(
           .json({ success: false, message: "Authentication required" });
       }
 
+      const committeeIds = await prisma.committee
+        .findMany({
+          where: {
+            members: {
+              some: { id: userId },
+            },
+          },
+          select: { id: true },
+        })
+        .then((committees) => committees.map((committee) => committee.id));
+
       const appraisals = await prisma.appraisal.findMany({
         where: {
           status: { in: ["HOD_REVIEW", "COMMITTEE_REVIEW"] },
-          committeeAssignments: {
-            some: {
-              committee: {
-                members: {
-                  some: { id: userId },
+          OR: [
+            {
+              committeeAssignments: {
+                some: {
+                  committeeId: { in: committeeIds },
                 },
               },
             },
-          },
+            {
+              AND: [
+                { status: "COMMITTEE_REVIEW" },
+                {
+                  committeeAssignments: {
+                    none: {},
+                  },
+                },
+              ],
+            },
+          ],
         },
         include: {
           cycle: {
@@ -260,16 +293,47 @@ router.get(
             },
           },
           user: {
-            select: { id: true, email: true, firstName: true, lastName: true },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              department: { select: { id: true, name: true } },
+            },
+          },
+          items: {
+            select: {
+              id: true,
+              key: true,
+              points: true,
+              notes: true,
+            },
+          },
+          committeeAssignments: {
+            select: { committeeId: true },
           },
         },
         orderBy: { submittedAt: "desc" },
       });
 
+      const payload = appraisals.map((appraisal) => ({
+        id: appraisal.id,
+        status: appraisal.status,
+        submittedAt: appraisal.submittedAt,
+        finalScore: appraisal.finalScore,
+        user: appraisal.user,
+        cycle: appraisal.cycle,
+        totalSelectedPoints: appraisal.items.reduce(
+          (sum, item) => sum + item.points,
+          0,
+        ),
+        itemsCount: appraisal.items.length,
+      }));
+
       res.json({
         success: true,
         message: "Appraisals for committee review retrieved",
-        data: appraisals,
+        data: payload,
       });
     } catch (error) {
       next(error);
@@ -349,21 +413,17 @@ router.put(
       }
 
       if (appraisal.userId !== userId) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: "Can only edit your own appraisal",
-          });
+        return res.status(403).json({
+          success: false,
+          message: "Can only edit your own appraisal",
+        });
       }
 
       if (appraisal.status !== "DRAFT" || appraisal.locked) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Only unlocked draft appraisals can be edited",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Only unlocked draft appraisals can be edited",
+        });
       }
 
       const existingItemIds = parsed.items
@@ -380,12 +440,10 @@ router.put(
         });
 
         if (ownedItems.length !== existingItemIds.length) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "One or more appraisal items are invalid",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "One or more appraisal items are invalid",
+          });
         }
       }
 
@@ -427,8 +485,6 @@ router.put(
   },
 );
 
-// Get user's appraisals
-// Get single appraisal
 router.get(
   "/:appraisalId",
   authenticateRequest,
@@ -521,12 +577,10 @@ router.post(
       }
 
       if (!["HOD_REVIEW", "COMMITTEE_REVIEW"].includes(appraisal.status)) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Appraisal is not ready for committee review",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Appraisal is not ready for committee review",
+        });
       }
 
       const updated = await prisma.appraisal.update({
@@ -581,7 +635,6 @@ router.post(
   },
 );
 
-// Submit appraisal
 router.post(
   "/:appraisalId/submit",
   authenticateRequest,
@@ -608,12 +661,10 @@ router.post(
       }
 
       if (appraisal.userId !== userId) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: "Can only submit your own appraisal",
-          });
+        return res.status(403).json({
+          success: false,
+          message: "Can only submit your own appraisal",
+        });
       }
 
       if (appraisal.status !== "DRAFT") {
@@ -624,13 +675,10 @@ router.post(
       }
 
       if (appraisal.items.length === 0) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              "Appraisal must contain at least one item before submission",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Appraisal must contain at least one item before submission",
+        });
       }
 
       const { finalScore, finalPercent } = computeFinalScores(appraisal.items);

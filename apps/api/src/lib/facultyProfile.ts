@@ -188,9 +188,15 @@ export function serializeFacultyProfile(user: UserProfileRecord) {
   };
 }
 
-export function encryptFacultyIdentity(input: { pan: string; aadhar: string }) {
+export function encryptFacultyIdentity(input: {
+  pan?: string | null;
+  aadhar?: string | null;
+}) {
+  const pan = input.pan?.trim();
+  const aadhar = input.aadhar?.trim();
+
   return {
-    panEncrypted: encryptSensitiveValue(input.pan.trim()),
-    aadharEncrypted: encryptSensitiveValue(input.aadhar.trim()),
+    panEncrypted: pan ? encryptSensitiveValue(pan) : null,
+    aadharEncrypted: aadhar ? encryptSensitiveValue(aadhar) : null,
   };
 }

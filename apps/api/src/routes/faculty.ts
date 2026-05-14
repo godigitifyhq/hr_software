@@ -31,6 +31,7 @@ type PolicyCriterion = {
   key: string;
   heading: string;
   options: PolicyOption[];
+  category?: "Academics" | "Research" | "Others";
 };
 
 type AppraisalPolicy = {
@@ -59,6 +60,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "academics_average_result",
     heading: "I. Academics Average Result (0 to 4)",
+    category: "Academics",
     options: [
       { value: "below_40", label: "Below 40%", points: 1 },
       { value: "between_40_60", label: "40 - 60%", points: 2 },
@@ -69,6 +71,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "scopus_papers",
     heading: "II. Scopus Paper Published / Accepted",
+    category: "Research",
     options: [
       { value: "paper_1", label: "Paper 1", points: 1 },
       { value: "paper_2", label: "Paper 2", points: 2 },
@@ -79,6 +82,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "impact_factor",
     heading: "III. Total Impact Factor During Assessment Year",
+    category: "Research",
     options: [
       { value: "between_0_2", label: "0 to 2", points: 1 },
       { value: "between_2_5", label: "2 to 5", points: 2 },
@@ -89,6 +93,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "book_chapter_book_patent",
     heading: "IV. Book Chapter / Book / Patent",
+    category: "Research",
     options: [
       { value: "book_chapter_1", label: "1 Book Chapter", points: 1 },
       {
@@ -113,6 +118,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "conference_seminar_symposia",
     heading: "V. Conference / Seminar / Symposia",
+    category: "Research",
     options: [
       { value: "attended_one", label: "Any one attended", points: 1 },
       {
@@ -135,6 +141,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "fdp_stp",
     heading: "VI. FDP / STP",
+    category: "Academics",
     options: [
       { value: "fdp_attended", label: "FDP attended", points: 1 },
       { value: "fdp_conducted", label: "FDP conducted", points: 2 },
@@ -154,6 +161,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "research_project_consultancy",
     heading: "VII. Research Project / Consultancy Granted During Academic Year",
+    category: "Research",
     options: [
       { value: "between_10000_50000", label: "10,000 to 50,000", points: 1 },
       { value: "between_51000_100000", label: "51,000 to 1,00,000", points: 2 },
@@ -168,6 +176,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "research_guidance",
     heading: "VIII. Research Guidance [PG Thesis Guided]",
+    category: "Research",
     options: [
       { value: "one_complete_thesis", label: "1 Complete Thesis", points: 1 },
       {
@@ -186,6 +195,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "co_curricular_activities",
     heading: "IX. Co-Curricular Activities",
+    category: "Others",
     options: [
       {
         value: "participate_institutional",
@@ -208,6 +218,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "attendance",
     heading: "X. Attendance",
+    category: "Others",
     options: [
       { value: "more_than_80", label: "More than 80%", points: 1 },
       { value: "more_than_90", label: "More than 90%", points: 2 },
@@ -218,6 +229,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "awards_recognition",
     heading: "XI. Awards / Recognition / Employee of the Month",
+    category: "Others",
     options: [
       {
         value: "university_or_community",
@@ -237,6 +249,7 @@ const baseCriteria: PolicyCriterion[] = [
   {
     key: "hod_remarks_score",
     heading: "XII. HOD's Remarks",
+    category: "Others",
     options: [
       { value: "hod_1", label: "HOD remarks score 1", points: 1 },
       { value: "hod_2", label: "HOD remarks score 2", points: 2 },
@@ -250,6 +263,7 @@ const hodOnlyCriteria: PolicyCriterion[] = [
   {
     key: "fee_recovery",
     heading: "XIII. Fee Recovery",
+    category: "Others",
     options: [
       {
         value: "fifty_percent_next_sem",
@@ -265,6 +279,7 @@ const hodOnlyCriteria: PolicyCriterion[] = [
     key: "awards_outside_svgoi",
     heading:
       "XIV. Awards Earned by Department Students in Events Organized Outside SVGOI",
+    category: "Others",
     options: [
       { value: "upto_2_awards", label: "Upto 2 awards", points: 1 },
       { value: "winning_cash_prize", label: "Winning Cash Prize", points: 2 },
@@ -275,6 +290,7 @@ const hodOnlyCriteria: PolicyCriterion[] = [
   {
     key: "overall_university_result",
     heading: "XV. Overall University Result",
+    category: "Academics",
     options: [
       {
         value: "thirty_percent",
@@ -289,6 +305,7 @@ const hodOnlyCriteria: PolicyCriterion[] = [
   {
     key: "placement",
     heading: "XVI. Placement",
+    category: "Academics",
     options: [
       {
         value: "thirty_percent",
@@ -304,6 +321,7 @@ const hodOnlyCriteria: PolicyCriterion[] = [
     key: "department_university_positions",
     heading:
       "XVII. Position Earned by Department Students in University Academics",
+    category: "Academics",
     options: [
       { value: "between_0_5_students", label: "0 - 5 students", points: 1 },
       {
@@ -398,6 +416,7 @@ function getProfileUser(userId: string) {
       documents: {
         select: {
           id: true,
+          module: true,
           fieldKey: true,
           name: true,
           originalName: true,
@@ -449,7 +468,7 @@ async function deletePreviousImage(imageUrl: string | null) {
 router.get(
   "/profile",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   async (req: AuthenticatedRequest, res, next) => {
     try {
       const userId = req.auth?.sub;
@@ -480,7 +499,7 @@ router.get(
 router.put(
   "/profile",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   async (req: AuthenticatedRequest, res, next) => {
     try {
       const userId = req.auth?.sub;
@@ -496,6 +515,10 @@ router.put(
         pan: parsed.pan,
         aadhar: parsed.aadhar,
       });
+      const qualification = parsed.qualification?.trim() || null;
+      const graduation = parsed.graduation?.trim() || null;
+      const postGraduation = parsed.postGraduation?.trim() || null;
+      const phdDegree = parsed.phdDegree?.trim() || null;
 
       await prisma.$transaction([
         prisma.user.update({
@@ -516,10 +539,10 @@ router.put(
             aadharEncrypted: encryptedIdentity.aadharEncrypted,
             tenthMarks: parsed.tenthMarks,
             twelfthMarks: parsed.twelfthMarks,
-            qualification: parsed.qualification.trim(),
-            graduation: parsed.graduation.trim(),
-            postGraduation: parsed.postGraduation?.trim() || null,
-            phdDegree: parsed.phdDegree?.trim() || null,
+            qualification,
+            graduation,
+            postGraduation,
+            phdDegree,
             totalExperience: parsed.totalExperience,
           },
           create: {
@@ -533,10 +556,10 @@ router.put(
             aadharEncrypted: encryptedIdentity.aadharEncrypted,
             tenthMarks: parsed.tenthMarks,
             twelfthMarks: parsed.twelfthMarks,
-            qualification: parsed.qualification.trim(),
-            graduation: parsed.graduation.trim(),
-            postGraduation: parsed.postGraduation?.trim() || null,
-            phdDegree: parsed.phdDegree?.trim() || null,
+            qualification,
+            graduation,
+            postGraduation,
+            phdDegree,
             totalExperience: parsed.totalExperience,
           },
         }),
@@ -562,7 +585,7 @@ router.put(
 router.post(
   "/profile/image",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   express.raw({
     type: Object.keys(allowedImageTypes),
     limit: "4mb",
@@ -633,7 +656,7 @@ router.post(
 router.get(
   "/appraisal/policy",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   async (req: AuthenticatedRequest, res) => {
     const policy = policyForRoles(req.auth?.roles || []);
     res.json({
@@ -647,7 +670,7 @@ router.get(
 router.get(
   "/appraisal/status",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   async (req: AuthenticatedRequest, res, next) => {
     try {
       const userId = req.auth?.sub;
@@ -700,10 +723,188 @@ router.get(
   },
 );
 
+// Get appraisal details - view submitted form
+router.get(
+  "/appraisal/:appraisalId",
+  authenticateRequest,
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "HR", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const userId = req.auth?.sub;
+      const { appraisalId } = req.params;
+
+      if (!userId) {
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const appraisal = await prisma.appraisal.findUnique({
+        where: { id: appraisalId },
+        include: {
+          cycle: {
+            select: { id: true, name: true, startDate: true, endDate: true },
+          },
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              departmentId: true,
+              department: { select: { id: true, name: true } },
+            },
+          },
+          items: {
+            select: {
+              id: true,
+              key: true,
+              points: true,
+              weight: true,
+              notes: true,
+            },
+          },
+        },
+      });
+
+      if (!appraisal) {
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
+        return;
+      }
+
+      // Access control: user can view their own, or HOD/COMMITTEE can view if in their purview
+      const isOwnAppraisal = appraisal.user.id === userId;
+      const userRoles = req.auth?.roles || [];
+      const isAdmin =
+        userRoles.includes("SUPER_ADMIN") || userRoles.includes("HR");
+
+      if (!isOwnAppraisal && !isAdmin) {
+        // HOD can view faculty from same dept, COMMITTEE can view assigned appraisals
+        if (userRoles.includes("HOD")) {
+          const dept = await prisma.department.findFirst({
+            where: { hodId: userId },
+            select: { id: true },
+          });
+          if (!dept || dept.id !== appraisal.user.departmentId) {
+            res.status(403).json({ success: false, message: "Access denied" });
+            return;
+          }
+        } else if (userRoles.includes("COMMITTEE")) {
+          // Check if appraisal is assigned to this committee member
+          const assignment = await prisma.committeeAssignment.findFirst({
+            where: {
+              appraisalId,
+              committee: {
+                members: {
+                  some: { id: userId },
+                },
+              },
+            },
+          });
+          if (!assignment) {
+            res.status(403).json({ success: false, message: "Access denied" });
+            return;
+          }
+        } else {
+          res.status(403).json({ success: false, message: "Access denied" });
+          return;
+        }
+      }
+
+      // Parse item notes to extract selection and evidence
+      const items = appraisal.items.map((item) => {
+        let parsed = {};
+        if (item.notes) {
+          try {
+            parsed = JSON.parse(item.notes);
+          } catch {
+            // best effort
+          }
+        }
+
+        const hodReview =
+          typeof parsed.hodReview === "object" && parsed.hodReview
+            ? (parsed.hodReview as Record<string, unknown>)
+            : null;
+        const committeeReview =
+          typeof parsed.committeeReview === "object" && parsed.committeeReview
+            ? (parsed.committeeReview as Record<string, unknown>)
+            : null;
+
+        return {
+          id: item.id,
+          criterionKey: item.key,
+          heading:
+            typeof parsed.heading === "string" ? parsed.heading : item.key,
+          selectedValue:
+            typeof parsed.selectedValue === "string"
+              ? parsed.selectedValue
+              : "",
+          selectedLabel:
+            typeof parsed.selectedLabel === "string"
+              ? parsed.selectedLabel
+              : "",
+          facultyPoints: item.points,
+          hodApprovedPoints:
+            typeof hodReview?.approvedPoints === "number"
+              ? hodReview.approvedPoints
+              : item.points,
+          hodRemark:
+            typeof hodReview?.remark === "string" ? hodReview.remark : "",
+          committeeApprovedPoints:
+            typeof committeeReview?.approvedPoints === "number"
+              ? committeeReview.approvedPoints
+              : hodReview?.approvedPoints ?? item.points,
+          committeeRemark:
+            typeof committeeReview?.remark === "string"
+              ? committeeReview.remark
+              : "",
+          evidence:
+            typeof parsed.evidence === "object" &&
+            Array.isArray(parsed.evidence)
+              ? parsed.evidence
+              : parsed.evidence
+              ? [parsed.evidence]
+              : [],
+        };
+      });
+
+      const hodRemarksObj = appraisal.hodRemarks
+        ? JSON.parse(appraisal.hodRemarks)
+        : {};
+      const committeeNotesObj = appraisal.committeeNotes
+        ? JSON.parse(appraisal.committeeNotes)
+        : {};
+
+      res.json({
+        success: true,
+        message: "Appraisal details retrieved",
+        data: {
+          id: appraisal.id,
+          status: appraisal.status,
+          submittedAt: appraisal.submittedAt?.toISOString() ?? null,
+          user: appraisal.user,
+          cycle: appraisal.cycle,
+          items,
+          finalScore: appraisal.finalScore,
+          finalPercent: appraisal.finalPercent,
+          hodRemarks: hodRemarksObj,
+          committeeNotes: committeeNotesObj,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 router.post(
   "/appraisal/evidence/:criterionKey",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   express.raw({
     type: Object.keys(allowedEvidenceTypes),
     limit: "5mb",
@@ -757,8 +958,9 @@ router.post(
 
       await ensureEvidenceUploadDir();
       const sanitizedName = sanitizeFileName(originalFileName);
-      const fileName = `${userId}-${criterionKey}-${Date.now()}-${sanitizedName}${path.extname(sanitizedName) ? "" : extension
-        }`;
+      const fileName = `${userId}-${criterionKey}-${Date.now()}-${sanitizedName}${
+        path.extname(sanitizedName) ? "" : extension
+      }`;
       const filePath = path.join(getEvidenceUploadDir(), fileName);
       await fs.writeFile(filePath, body);
 
@@ -784,7 +986,7 @@ router.post(
 router.post(
   "/appraisal/request",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   async (req: AuthenticatedRequest, res, next) => {
     try {
       const userId = req.auth?.sub;
@@ -805,6 +1007,36 @@ router.post(
         res.status(400).json({
           success: false,
           message: "Complete profile before requesting appraisal",
+        });
+        return;
+      }
+
+      if (!user.departmentId) {
+        res.status(400).json({
+          success: false,
+          message: "Assign your department before requesting appraisal",
+        });
+        return;
+      }
+
+      const department = await prisma.department.findUnique({
+        where: { id: user.departmentId },
+        select: { id: true, name: true, hodId: true, deletedAt: true },
+      });
+
+      if (!department || department.deletedAt) {
+        res.status(400).json({
+          success: false,
+          message: "Department is not configured for appraisal workflow",
+        });
+        return;
+      }
+
+      if (!department.hodId) {
+        res.status(400).json({
+          success: false,
+          message:
+            "No HOD is assigned to your department yet. Please contact HR/Admin.",
         });
         return;
       }
@@ -918,7 +1150,7 @@ router.post(
           appraisalId,
           totalPoints,
           incrementPercent,
-          status: "SUBMITTED",
+          status: "HOD_REVIEW",
         },
       });
     } catch (error) {
@@ -941,9 +1173,10 @@ router.post(
       const { action } = req.body as { action?: string };
 
       if (!action || (action !== "approve" && action !== "reject")) {
-        res
-          .status(400)
-          .json({ success: false, message: 'Provide action: "approve" or "reject"' });
+        res.status(400).json({
+          success: false,
+          message: 'Provide action: "approve" or "reject"',
+        });
         return;
       }
 
@@ -952,13 +1185,18 @@ router.post(
         include: { user: { include: { department: true } } },
       });
       if (!appraisal) {
-        res.status(404).json({ success: false, message: "Appraisal not found" });
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
         return;
       }
 
       // Ensure appraisal is pending HOD review
       if (appraisal.status !== "HOD_REVIEW") {
-        res.status(400).json({ success: false, message: "Appraisal is not pending HOD review" });
+        res.status(400).json({
+          success: false,
+          message: "Appraisal is not pending HOD review",
+        });
         return;
       }
 
@@ -966,7 +1204,10 @@ router.post(
       const reviewerIsSuper = req.auth?.roles?.includes("SUPER_ADMIN");
       const hodIdForUser = appraisal.user?.department?.hodId;
       if (!reviewerIsSuper && reviewerId !== hodIdForUser) {
-        res.status(403).json({ success: false, message: "Only the department HOD can review this appraisal" });
+        res.status(403).json({
+          success: false,
+          message: "Only the department HOD can review this appraisal",
+        });
         return;
       }
 
@@ -986,11 +1227,18 @@ router.post(
             action: "APPRAISAL_HOD_APPROVE",
             resource: "Appraisal",
             resourceId: appraisalId,
-            meta: JSON.stringify({ comment, previousStatus: appraisal.status, newStatus: "COMMITTEE_REVIEW" }),
+            meta: JSON.stringify({
+              comment,
+              previousStatus: appraisal.status,
+              newStatus: "COMMITTEE_REVIEW",
+            }),
           },
         });
 
-        res.json({ success: true, message: "Appraisal approved and forwarded to committee" });
+        res.json({
+          success: true,
+          message: "Appraisal approved and forwarded to committee",
+        });
         return;
       }
 
@@ -1010,11 +1258,18 @@ router.post(
           action: "APPRAISAL_HOD_REJECT",
           resource: "Appraisal",
           resourceId: appraisalId,
-          meta: JSON.stringify({ comment, previousStatus: appraisal.status, newStatus: "DRAFT" }),
+          meta: JSON.stringify({
+            comment,
+            previousStatus: appraisal.status,
+            newStatus: "DRAFT",
+          }),
         },
       });
 
-      res.json({ success: true, message: "Appraisal rejected and reverted to draft" });
+      res.json({
+        success: true,
+        message: "Appraisal rejected and reverted to draft",
+      });
     } catch (error) {
       next(error);
     }
@@ -1032,20 +1287,28 @@ router.post(
       const { action } = req.body as { action?: string };
 
       if (!action || (action !== "approve" && action !== "reject")) {
-        res
-          .status(400)
-          .json({ success: false, message: 'Provide action: "approve" or "reject"' });
+        res.status(400).json({
+          success: false,
+          message: 'Provide action: "approve" or "reject"',
+        });
         return;
       }
 
-      const appraisal = await prisma.appraisal.findUnique({ where: { id: appraisalId } });
+      const appraisal = await prisma.appraisal.findUnique({
+        where: { id: appraisalId },
+      });
       if (!appraisal) {
-        res.status(404).json({ success: false, message: "Appraisal not found" });
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
         return;
       }
 
       if (appraisal.status !== "COMMITTEE_REVIEW") {
-        res.status(400).json({ success: false, message: "Appraisal is not pending committee review" });
+        res.status(400).json({
+          success: false,
+          message: "Appraisal is not pending committee review",
+        });
         return;
       }
 
@@ -1063,11 +1326,18 @@ router.post(
             action: "APPRAISAL_COMMITTEE_APPROVE",
             resource: "Appraisal",
             resourceId: appraisalId,
-            meta: JSON.stringify({ comment: (req.body as any)?.comment ?? null, previousStatus: appraisal.status, newStatus: "HR_FINALIZED" }),
+            meta: JSON.stringify({
+              comment: (req.body as any)?.comment ?? null,
+              previousStatus: appraisal.status,
+              newStatus: "HR_FINALIZED",
+            }),
           },
         });
 
-        res.json({ success: true, message: "Appraisal approved and forwarded to HR" });
+        res.json({
+          success: true,
+          message: "Appraisal approved and forwarded to HR",
+        });
         return;
       }
 
@@ -1087,11 +1357,18 @@ router.post(
           action: "APPRAISAL_COMMITTEE_REJECT",
           resource: "Appraisal",
           resourceId: appraisalId,
-          meta: JSON.stringify({ comment: (req.body as any)?.comment ?? null, previousStatus: appraisal.status, newStatus: "DRAFT" }),
+          meta: JSON.stringify({
+            comment: (req.body as any)?.comment ?? null,
+            previousStatus: appraisal.status,
+            newStatus: "DRAFT",
+          }),
         },
       });
 
-      res.json({ success: true, message: "Appraisal rejected and reverted to draft" });
+      res.json({
+        success: true,
+        message: "Appraisal rejected and reverted to draft",
+      });
     } catch (error) {
       next(error);
     }
@@ -1111,14 +1388,21 @@ router.post(
         finalPercent?: number;
       };
 
-      const appraisal = await prisma.appraisal.findUnique({ where: { id: appraisalId } });
+      const appraisal = await prisma.appraisal.findUnique({
+        where: { id: appraisalId },
+      });
       if (!appraisal) {
-        res.status(404).json({ success: false, message: "Appraisal not found" });
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
         return;
       }
 
       if (appraisal.status !== "HR_FINALIZED") {
-        res.status(400).json({ success: false, message: "Appraisal is not pending HR finalization" });
+        res.status(400).json({
+          success: false,
+          message: "Appraisal is not pending HR finalization",
+        });
         return;
       }
 
@@ -1138,7 +1422,10 @@ router.post(
           action: "APPRAISAL_HR_FINALIZE",
           resource: "Appraisal",
           resourceId: appraisalId,
-          meta: JSON.stringify({ finalScore: finalScore ?? appraisal.finalScore, finalPercent: finalPercent ?? appraisal.finalPercent }),
+          meta: JSON.stringify({
+            finalScore: finalScore ?? appraisal.finalScore,
+            finalPercent: finalPercent ?? appraisal.finalPercent,
+          }),
         },
       });
 

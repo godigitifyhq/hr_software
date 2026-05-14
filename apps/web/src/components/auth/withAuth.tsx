@@ -44,7 +44,12 @@ export function withAuth<P extends object>(
           allowedRoles.includes(role as UiRole),
         );
         if (!hasRole) {
-          router.replace("/unauthorized");
+          const required = encodeURIComponent(allowedRoles.join(","));
+          const current = encodeURIComponent(session.user.roles.join(","));
+          const path = encodeURIComponent(pathname || "/");
+          router.replace(
+            `/unauthorized?reason=missing-role&required=${required}&current=${current}&path=${path}`,
+          );
           return;
         }
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { resolvePostLoginPath } from "@/lib/faculty-access";
+import { getPrimaryRole, getRoleHomePath } from "@/lib/utils/routing";
 
 export default function Home() {
   const router = useRouter();
@@ -23,9 +24,7 @@ export default function Home() {
       try {
         nextPath = await resolvePostLoginPath(session.user.roles);
       } catch {
-        nextPath = session.user.roles.includes("FACULTY")
-          ? "/profile?complete=1"
-          : "/";
+        nextPath = getRoleHomePath(getPrimaryRole(session.user.roles));
       }
       if (active) {
         router.replace(nextPath);

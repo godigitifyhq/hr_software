@@ -129,9 +129,18 @@ function FacultyDashboardPage() {
                 Edit Profile
               </Link>
               {requestStatus?.hasRequest ? (
-                <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-success/20 bg-success-bg px-4 text-sm font-medium text-success">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Appraisal Requested
+                <div className="flex gap-2">
+                  <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-success/20 bg-success-bg px-4 text-sm font-medium text-success">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Appraisal Requested
+                  </div>
+                  <Link
+                    href={`/faculty-dashboard/appraisals/${requestStatus.appraisalId}/view`}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2"
+                  >
+                    View Form
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </div>
               ) : (
                 <Link

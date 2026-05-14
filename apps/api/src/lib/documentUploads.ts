@@ -29,6 +29,7 @@ export type DocumentUploadRequest = {
   mime: string;
   size: number;
   drive: DriveUploadResult;
+  storageProvider?: string;
   metadataJson?: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput;
 };
 
@@ -124,7 +125,7 @@ export async function upsertUploadedDocument(request: DocumentUploadRequest) {
       viewUrl: request.drive.viewUrl,
       directUrl: request.drive.directUrl,
       folderId: request.drive.folderId,
-      storageProvider: "google-drive",
+      storageProvider: request.storageProvider ?? "google-drive",
       metadataJson: request.metadataJson ?? Prisma.DbNull,
       deletedAt: null,
     },
@@ -140,12 +141,16 @@ export async function upsertUploadedDocument(request: DocumentUploadRequest) {
       viewUrl: request.drive.viewUrl,
       directUrl: request.drive.directUrl,
       folderId: request.drive.folderId,
-      storageProvider: "google-drive",
+      storageProvider: request.storageProvider ?? "google-drive",
       metadataJson: request.metadataJson ?? Prisma.DbNull,
     },
   });
 
-  if (existing?.driveId && existing.driveId !== request.drive.driveFileId) {
+  if (
+    existing?.storageProvider === "google-drive" &&
+    existing.driveId &&
+    existing.driveId !== request.drive.driveFileId
+  ) {
     await deleteDriveFile(existing.driveId);
   }
 

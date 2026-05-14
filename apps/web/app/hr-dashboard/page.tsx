@@ -1,277 +1,179 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api-client";
+import { Loader2, Users } from "lucide-react";
+import { withAuth } from "@/components/auth/withAuth";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { api } from "@/lib/api";
+import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
-import { formatDate } from "@/lib/date-utils";
 
-interface AppraisalItem {
+type HrRequestSummary = {
   id: string;
   status: string;
-  cycle: { name: string };
+  submittedAt?: string | null;
+  finalScore?: number | null;
   user: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
-    department?: { name: string };
+    department?: { id: string; name: string } | null;
   };
-  submittedAt?: string;
-  finalScore?: number;
-  finalPercent?: number;
-  createdAt: string;
-}
+  cycle: { id: string; name: string };
+  totalSelectedPoints: number;
+  itemsCount: number;
+};
 
-interface DashboardData {
-  all: AppraisalItem[];
-  byStatus: Record<string, AppraisalItem[]>;
-}
-
-export default function HrDashboardPage() {
-  const router = useRouter();
-  const { session, isHydrated } = useAuthStore();
-  const [data, setData] = useState<DashboardData | null>(null);
+function HrDashboardPage() {
+  const { session } = useAuthStore();
+  const role = getPrimaryRole(session?.user.roles ?? []);
+  const [requests, setRequests] = useState<HrRequestSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const { session, isHydrated } = useAuthStore.getState();
+    let active = true;
 
-    if (!isHydrated) {
-      const unsubscribe = useAuthStore.subscribe((state) => {
-        if (state.isHydrated) {
-          if (!state.session) {
-            router.push("/login");
-          } else {
-            checkAccessAndFetch();
-          }
-          unsubscribe();
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await api.hr.getTeamAppraisals();
+        if (!active) return;
+        setRequests(response.data ?? []);
+      } catch (loadError: any) {
+        if (active) {
+          setError(
+            loadError?.response?.data?.message ||
+              loadError?.message ||
+              "Failed to load HR dashboard",
+          );
         }
-      });
-      return;
+      } finally {
+        if (active) setLoading(false);
+      }
     }
 
-    if (!session) {
-      router.push("/login");
-      return;
-    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-    checkAccessAndFetch();
-  }, [router]);
-
-  async function checkAccessAndFetch() {
-    // Check if user has an HR-access role.
-    const allowedRoles = ["HR", "SUPER_ADMIN"];
-    const hasAccess = allowedRoles.some((role) =>
-      session?.user.roles.includes(role),
-    );
-    if (!hasAccess) {
-      setError("Access denied. Only HR staff or super admins can view this page.");
-      setLoading(false);
-      return;
-    }
-    fetchData();
-  }
-
-  async function fetchData() {
-    try {
-      setLoading(true);
-      setError(null);
-      const { data } = await apiClient.get("/appraisals/hr/dashboard");
-      setData(data.data);
-    } catch (err: any) {
-      const message =
-        err?.response?.data?.message || "Failed to load dashboard";
-      console.error("HR dashboard fetch error:", {
-        status: err?.response?.status,
-        message,
-        data: err?.response?.data,
-      });
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const statusConfig: Record<string, { label: string; color: string }> = {
-    DRAFT: { label: "Draft", color: "bg-slate-100 text-slate-700" },
-    SUBMITTED: { label: "Submitted", color: "bg-blue-100 text-blue-700" },
-    HOD_REVIEW: { label: "HOD Review", color: "bg-yellow-100 text-yellow-700" },
-    COMMITTEE_REVIEW: {
-      label: "Committee Review",
-      color: "bg-purple-100 text-purple-700",
-    },
-    HR_FINALIZED: { label: "Finalized", color: "bg-green-100 text-green-700" },
-    CLOSED: { label: "Closed", color: "bg-gray-100 text-gray-700" },
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-50">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-            <Link
-              href="/"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900"
-            >
-              ← Back to Dashboard
-            </Link>
-          </div>
-        </header>
-        <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center py-16">
-            <div className="text-center">
-              <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900"></div>
-              <p className="text-sm text-slate-600">Loading dashboard…</p>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-50">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-            <Link
-              href="/"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900"
-            >
-              ← Back to Dashboard
-            </Link>
-          </div>
-        </header>
-        <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-            <p className="text-sm font-medium text-red-800">
-              {error || "Failed to load dashboard"}
-            </p>
-            <button
-              onClick={fetchData}
-              className="mt-4 rounded-full bg-red-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800"
-            >
-              Try Again
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  const pendingCount = useMemo(
+    () =>
+      requests.filter(
+        (r) => r.status === "HR_FINALIZED" || r.status === "COMMITTEE_REVIEW",
+      ).length,
+    [requests],
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-50">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <Link
-              href="/"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900"
-            >
-              ← Back to Dashboard
-            </Link>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              HR Dashboard
-            </h1>
-          </div>
-          <button
-            onClick={fetchData}
-            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
-          >
-            Refresh
-          </button>
-        </div>
-      </header>
+    <AppShell role={role}>
+      <PageHeader
+        title="HR Dashboard"
+        subtitle="Review committee-finalized appraisals and manage employee records."
+        actions={undefined}
+      />
 
-      {/* Content */}
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        {/* Summary Stats */}
-        <div className="grid gap-6 md:grid-cols-3 mb-8">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <p className="text-sm font-medium text-slate-600">
-              Total Appraisals
-            </p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {data.all.length}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <p className="text-sm font-medium text-slate-600">Pending Review</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {(data.byStatus["SUBMITTED"]?.length || 0) +
-                (data.byStatus["HOD_REVIEW"]?.length || 0)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <p className="text-sm font-medium text-slate-600">Finalized</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {data.byStatus["HR_FINALIZED"]?.length || 0}
-            </p>
+      {loading ? (
+        <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <div className="flex items-center gap-3 text-text-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Loading HR dashboard...</span>
           </div>
         </div>
+      ) : (
+        <>
+          {error ? (
+            <div className="mb-6 rounded-2xl border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
+              {error}
+            </div>
+          ) : null}
 
-        {/* Appraisals by Status */}
-        <div className="space-y-8">
-          {Object.entries(data.byStatus).map(([status, appraisals]) => {
-            if (appraisals.length === 0) return null;
-            const config = statusConfig[status as keyof typeof statusConfig];
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                Total Appraisals
+              </p>
+              <p className="mt-2 font-display text-3xl font-bold text-text">
+                {requests.length}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                Pending Review
+              </p>
+              <p className="mt-2 font-display text-3xl font-bold text-text">
+                {pendingCount}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                Finalized
+              </p>
+              <p className="mt-2 text-sm font-medium text-text">
+                {requests.filter((r) => r.status === "CLOSED").length} closed
+              </p>
+            </div>
+          </div>
 
-            return (
-              <div key={status}>
-                <h2 className="mb-4 text-lg font-semibold flex items-center gap-2">
-                  <span
-                    className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${config?.color}`}
-                  >
-                    {config?.label || status}
-                  </span>
-                  <span className="text-slate-600">({appraisals.length})</span>
-                </h2>
-                <div className="space-y-2">
-                  {appraisals.map((appraisal) => (
-                    <Link
-                      key={appraisal.id}
-                      href={`/appraisals/${appraisal.id}`}
-                      className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-slate-900">
-                            {appraisal.user.firstName} {appraisal.user.lastName}
-                          </h3>
-                          <p className="text-xs text-slate-600">
-                            {appraisal.user.email}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {appraisal.user.department?.name || "N/A"} •{" "}
-                            {appraisal.cycle.name}
-                          </p>
-                        </div>
-                        {appraisal.finalScore !== undefined &&
-                          appraisal.finalScore !== null && (
-                            <div className="text-right">
-                              <p className="text-sm font-semibold text-slate-900">
-                                {appraisal.finalScore.toFixed(2)}
-                              </p>
-                              {appraisal.finalPercent !== undefined && (
-                                <p className="text-xs text-slate-600">
-                                  {appraisal.finalPercent.toFixed(1)}%
-                                </p>
-                              )}
-                            </div>
-                          )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Users className="h-5 w-5 text-brand" />
+              <h2 className="font-display text-xl font-semibold text-text">
+                Appraisals for HR
+              </h2>
+            </div>
+
+            {requests.length === 0 ? (
+              <div className="rounded-xl border border-border bg-bg p-6 text-sm text-text-2">
+                No appraisals available for HR review.
               </div>
-            );
-          })}
-        </div>
-      </main>
-    </div>
+            ) : (
+              <div className="space-y-3">
+                {requests.map((request) => (
+                  <article
+                    key={request.id}
+                    className="rounded-xl border border-border bg-bg p-4"
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold text-text">
+                          {request.user.firstName} {request.user.lastName}
+                        </p>
+                        <p className="text-xs text-text-2">
+                          {request.user.email}
+                        </p>
+                        <p className="mt-1 text-xs text-text-3">
+                          {request.cycle.name} | {request.itemsCount} criteria |{" "}
+                          {request.totalSelectedPoints} selected points
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-brand-light px-3 py-1 text-xs font-semibold text-brand">
+                          {request.status}
+                        </span>
+                        <Link
+                          href={`/hr-review/${request.id}/review`}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text transition hover:bg-surface-2"
+                        >
+                          Review
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+    </AppShell>
   );
 }
+
+export default withAuth(HrDashboardPage, ["HR"]);

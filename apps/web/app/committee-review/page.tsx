@@ -1,194 +1,280 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { apiClient } from '@/lib/api-client'
-import { useAuthStore } from '@/store/auth'
-import { formatDate } from '@/lib/date-utils'
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Filter,
+  Eye,
+} from "lucide-react";
+import { withAuth } from "@/components/auth/withAuth";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { api } from "@/lib/api";
+import { getPrimaryRole } from "@/lib/utils/routing";
+import { useAuthStore } from "@/store/auth";
 
 interface AppraisalForReview {
-  id: string
-  status: 'HOD_REVIEW' | 'COMMITTEE_REVIEW'
-  cycle: { name: string; startDate: string; endDate: string }
-  user: { id: string; email: string; firstName: string; lastName: string }
-  submittedAt?: string
-  createdAt: string
+  id: string;
+  status: string;
+  cycle: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+  };
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    department?: {
+      id: string;
+      name: string;
+    } | null;
+  };
+  submittedAt: string;
+  finalScore: number | null;
+  totalSelectedPoints: number;
+  itemsCount: number;
 }
 
-export default function CommitteeReviewPage() {
-  const router = useRouter()
-  const { session, isHydrated } = useAuthStore()
-  const [appraisals, setAppraisals] = useState<AppraisalForReview[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+function CommitteeDashboardPage() {
+  const { session } = useAuthStore();
+  const role = getPrimaryRole(session?.user.roles ?? []);
+
+  const [appraisals, setAppraisals] = useState<AppraisalForReview[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<
+    "All" | "Academics" | "Research" | "Others"
+  >("All");
 
   useEffect(() => {
-    const { session, isHydrated } = useAuthStore.getState();
-    
-    if (!isHydrated) {
-      const unsubscribe = useAuthStore.subscribe(
-        (state) => {
-          if (state.isHydrated) {
-            if (!state.session) {
-              router.push('/login');
-            } else {
-              checkAccessAndFetch();
-            }
-            unsubscribe();
-          }
+    let active = true;
+
+    async function loadAppraisals() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await api.committee.getTeamAppraisals();
+
+        if (active) {
+          setAppraisals(
+            response.data.map((appraisal) => ({
+              ...appraisal,
+              totalSelectedPoints: appraisal.items?.reduce(
+                (sum, item) => sum + (item.points ?? 0),
+                0,
+              ),
+              itemsCount: appraisal.items?.length ?? 0,
+            })) as AppraisalForReview[],
+          );
         }
-      );
-      return;
+      } catch (loadError: any) {
+        if (active) {
+          setError(
+            loadError?.response?.data?.message ||
+              loadError?.message ||
+              "Failed to load appraisals for review",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     }
-    
-    if (!session) {
-      router.push('/login');
-      return;
-    }
-    
-    checkAccessAndFetch();
-  }, [router])
 
-  async function checkAccessAndFetch() {
-    // Check if user has COMMITTEE role
-    if (!session?.user.roles.includes('COMMITTEE') && !session?.user.roles.includes('SUPER_ADMIN')) {
-      setError('Access denied. Only committee members or super admins can view this page.');
-      setLoading(false);
-      return;
-    }
-    fetchAppraisals();
-  }
+    void loadAppraisals();
 
-  async function fetchAppraisals() {
-    try {
-      setLoading(true)
-      setError(null)
-      const { data } = await apiClient.get('/appraisals/committee/review-list')
-      setAppraisals(data.data || [])
-    } catch (err: any) {
-      const message = err?.response?.data?.message || 'Failed to load appraisals for review'
-      console.error('Committee review fetch error:', {
-        status: err?.response?.status,
-        message,
-        data: err?.response?.data
-      })
-      setError(message)
-      setAppraisals([])
-    } finally {
-      setLoading(false)
-    }
-  }
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const statusConfig = {
-    HOD_REVIEW: { label: 'Awaiting Review', color: 'bg-yellow-100 text-yellow-700' },
-    COMMITTEE_REVIEW: { label: 'In Review', color: 'bg-purple-100 text-purple-700' }
+  const getStatusBadge = (status: string) => {
+    const badges: Record<
+      string,
+      { bg: string; text: string; icon: React.ReactNode }
+    > = {
+      COMMITTEE_REVIEW: {
+        bg: "bg-blue-100",
+        text: "text-blue-800",
+        icon: <AlertCircle className="h-3.5 w-3.5" />,
+      },
+      HR_FINALIZED: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+      },
+    };
+
+    const badge = badges[status] || badges.COMMITTEE_REVIEW;
+    return (
+      <div
+        className={`inline-flex items-center gap-1.5 rounded-full ${badge.bg} ${badge.text} px-3 py-1 text-xs font-semibold uppercase tracking-wider`}
+      >
+        {badge.icon}
+        {status.replace(/_/g, " ")}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <AppShell role={role}>
+        <div className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-surface p-6">
+          <Loader2 className="h-5 w-5 animate-spin text-brand" />
+          <span className="text-sm text-text-2">Loading appraisals...</span>
+        </div>
+      </AppShell>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-50">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <Link href="/" className="text-sm font-medium text-slate-600 hover:text-slate-900">
-              ← Back to Dashboard
-            </Link>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Committee Review</h1>
+    <AppShell role={role}>
+      <PageHeader
+        title="Committee Review Dashboard"
+        subtitle="Review and approve faculty appraisals submitted by HOD"
+      />
+
+      {error && (
+        <div className="mb-6 rounded-2xl border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+            <div>{error}</div>
           </div>
-          <button
-            onClick={fetchAppraisals}
-            disabled={loading}
-            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50 disabled:opacity-60"
-          >
-            {loading ? 'Loading…' : 'Refresh'}
-          </button>
         </div>
-      </header>
+      )}
 
-      {/* Content */}
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-medium text-red-800">{error}</p>
+      {appraisals.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-surface p-12 text-center">
+          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-bg">
+            <CheckCircle2 className="h-6 w-6 text-text-3" />
           </div>
-        )}
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="text-center">
-              <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900"></div>
-              <p className="text-sm text-slate-600">Loading appraisals…</p>
+          <h3 className="mb-2 font-display text-lg font-semibold text-text">
+            No appraisals to review
+          </h3>
+          <p className="text-sm text-text-2">
+            There are no appraisals pending committee review at this time.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Filter Section */}
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <Filter className="h-4 w-4 text-text-2" />
+              <p className="text-sm font-semibold text-text">
+                Filter by Category
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(["All", "Academics", "Research", "Others"] as const).map(
+                (cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setFilterCategory(cat)}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                      filterCategory === cat
+                        ? "bg-brand text-white"
+                        : "border border-border bg-bg text-text hover:bg-surface"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ),
+              )}
             </div>
           </div>
-        ) : appraisals.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
-            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-              <svg
-                className="h-6 w-6 text-slate-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+
+          {/* Appraisals Grid */}
+          <div className="grid gap-4">
+            {appraisals.map((appraisal) => (
+              <div
+                key={appraisal.id}
+                className="rounded-2xl border border-border bg-surface p-6 shadow-sm hover:shadow-md transition"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </div>
-            <h3 className="mb-2 text-lg font-semibold">No appraisals to review</h3>
-            <p className="mb-6 text-sm text-slate-600">
-              There are no appraisals pending committee review at this time.
-            </p>
-            <button
-              onClick={fetchAppraisals}
-              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {appraisals.map((appraisal) => {
-              const status = statusConfig[appraisal.status]
-              return (
-                <Link
-                  key={appraisal.id}
-                  href={`/appraisals/${appraisal.id}`}
-                  className="block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-300 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-slate-900">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-3">
+                      <div>
+                        <h4 className="font-semibold text-text">
                           {appraisal.user.firstName} {appraisal.user.lastName}
-                        </h3>
-                        <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${status.color}`}>
-                          {status.label}
-                        </span>
-                      </div>
-                      <div className="mb-2 text-sm text-slate-600">
-                        <p>{appraisal.user.email}</p>
-                        <p className="text-xs">Cycle: {appraisal.cycle.name}</p>
-                      </div>
-                      <div className="flex gap-4 text-sm text-slate-600">
-                        <span>Submitted: {formatDate(appraisal.submittedAt || appraisal.createdAt)}</span>
+                        </h4>
+                        <p className="text-xs text-text-3 mt-0.5">
+                          {appraisal.user.email}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        Review
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-lg bg-bg p-3">
+                        <p className="text-xs font-semibold text-text-3 uppercase tracking-wider">
+                          Department
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-text">
+                          {appraisal.user.department?.name ?? "Not assigned"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-bg p-3">
+                        <p className="text-xs font-semibold text-text-3 uppercase tracking-wider">
+                          Cycle
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-text">
+                          {appraisal.cycle.name}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-bg p-3">
+                        <p className="text-xs font-semibold text-text-3 uppercase tracking-wider">
+                          Total Points
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-text">
+                          {appraisal.totalSelectedPoints}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-bg p-3">
+                        <p className="text-xs font-semibold text-text-3 uppercase tracking-wider">
+                          Status
+                        </p>
+                        <div className="mt-1">
+                          {getStatusBadge(appraisal.status)}
+                        </div>
                       </div>
                     </div>
+
+                    <p className="mt-3 text-xs text-text-3">
+                      Submitted:{" "}
+                      {new Date(appraisal.submittedAt).toLocaleDateString()}
+                    </p>
                   </div>
-                </Link>
-              )
-            })}
+
+                  {appraisal.status === "COMMITTEE_REVIEW" && (
+                    <div className="flex flex-col gap-2">
+                      <Link
+                        href={`/committee-review/${appraisal.id}/review`}
+                        className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-white shadow-sm transition hover:bg-brand-dark whitespace-nowrap"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Review
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </main>
-    </div>
-  )
+        </div>
+      )}
+    </AppShell>
+  );
 }
+
+export default withAuth(CommitteeDashboardPage, ["COMMITTEE"]);

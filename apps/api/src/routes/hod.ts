@@ -6,7 +6,10 @@ import {
   requireRoles,
 } from "../middleware/rbac";
 import { prisma } from "../lib/prisma";
-import { calculateHodScore, persistHodScore } from "../services/hodScoringService";
+import {
+  calculateHodScore,
+  persistHodScore,
+} from "../services/hodScoringService";
 import { writeAuditLog } from "../lib/audit";
 
 const router: express.Router = express.Router();
@@ -93,7 +96,9 @@ router.post(
       const actorId = req.auth?.sub;
 
       if (!actorId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -108,19 +113,23 @@ router.post(
       });
 
       if (!appraisal) {
-        res.status(404).json({ success: false, message: "Appraisal not found" });
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
         return;
       }
 
       if (!["SUBMITTED", "HOD_REVIEW"].includes(appraisal.status)) {
-        res
-          .status(400)
-          .json({ success: false, message: "Appraisal is not ready for HOD scoring" });
+        res.status(400).json({
+          success: false,
+          message: "Appraisal is not ready for HOD scoring",
+        });
         return;
       }
 
       const isHr =
-        req.auth?.roles?.includes("HR") || req.auth?.roles?.includes("SUPER_ADMIN");
+        req.auth?.roles?.includes("HR") ||
+        req.auth?.roles?.includes("SUPER_ADMIN");
       if (!isHr) {
         const hasDepartmentMatch = await isHodForUser(
           actorId,
@@ -153,7 +162,9 @@ router.get(
     try {
       const hodId = req.auth?.sub;
       if (!hodId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -212,7 +223,10 @@ router.get(
         finalScore: appraisal.finalScore,
         user: appraisal.user,
         cycle: appraisal.cycle,
-        totalSelectedPoints: appraisal.items.reduce((sum, item) => sum + item.points, 0),
+        totalSelectedPoints: appraisal.items.reduce(
+          (sum, item) => sum + item.points,
+          0,
+        ),
         itemsCount: appraisal.items.length,
       }));
 
@@ -235,7 +249,9 @@ router.get(
     try {
       const hodId = req.auth?.sub;
       if (!hodId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -269,22 +285,35 @@ router.get(
       });
 
       if (!appraisal) {
-        res.status(404).json({ success: false, message: "Appraisal not found" });
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
         return;
       }
 
       if (appraisal.userId === hodId) {
-        res.status(403).json({ success: false, message: "Cannot review your own appraisal" });
+        res.status(403).json({
+          success: false,
+          message: "Cannot review your own appraisal",
+        });
         return;
       }
 
-      const isFaculty = appraisal.user.roles.some((role) => role.role === "FACULTY");
+      const isFaculty = appraisal.user.roles.some(
+        (role) => role.role === "FACULTY",
+      );
       if (!isFaculty) {
-        res.status(400).json({ success: false, message: "Only faculty requests are reviewable here" });
+        res.status(400).json({
+          success: false,
+          message: "Only faculty requests are reviewable here",
+        });
         return;
       }
 
-      const allowed = await isHodForUser(hodId, appraisal.user.departmentId ?? null);
+      const allowed = await isHodForUser(
+        hodId,
+        appraisal.user.departmentId ?? null,
+      );
       if (!allowed && !req.auth?.roles?.includes("SUPER_ADMIN")) {
         res.status(403).json({ success: false, message: "Access denied" });
         return;
@@ -303,9 +332,13 @@ router.get(
           heading:
             typeof parsed.heading === "string" ? parsed.heading : item.key,
           selectedValue:
-            typeof parsed.selectedValue === "string" ? parsed.selectedValue : "",
+            typeof parsed.selectedValue === "string"
+              ? parsed.selectedValue
+              : "",
           selectedLabel:
-            typeof parsed.selectedLabel === "string" ? parsed.selectedLabel : "",
+            typeof parsed.selectedLabel === "string"
+              ? parsed.selectedLabel
+              : "",
           facultyPoints:
             typeof hodReview?.originalPoints === "number"
               ? Number(hodReview.originalPoints)
@@ -315,7 +348,9 @@ router.get(
               ? Number(hodReview.approvedPoints)
               : item.points,
           hodRemark:
-            typeof hodReview?.remark === "string" ? String(hodReview.remark) : "",
+            typeof hodReview?.remark === "string"
+              ? String(hodReview.remark)
+              : "",
           evidence:
             typeof parsed.evidence === "object" && parsed.evidence
               ? parsed.evidence
@@ -363,7 +398,9 @@ router.put(
     try {
       const hodId = req.auth?.sub;
       if (!hodId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -392,7 +429,9 @@ router.put(
       });
 
       if (!appraisal) {
-        res.status(404).json({ success: false, message: "Appraisal not found" });
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
         return;
       }
 
@@ -405,17 +444,28 @@ router.put(
       }
 
       if (appraisal.userId === hodId) {
-        res.status(403).json({ success: false, message: "Cannot review your own appraisal" });
+        res.status(403).json({
+          success: false,
+          message: "Cannot review your own appraisal",
+        });
         return;
       }
 
-      const isFaculty = appraisal.user.roles.some((role) => role.role === "FACULTY");
+      const isFaculty = appraisal.user.roles.some(
+        (role) => role.role === "FACULTY",
+      );
       if (!isFaculty) {
-        res.status(400).json({ success: false, message: "Target request is not a faculty appraisal" });
+        res.status(400).json({
+          success: false,
+          message: "Target request is not a faculty appraisal",
+        });
         return;
       }
 
-      const allowed = await isHodForUser(hodId, appraisal.user.departmentId ?? null);
+      const allowed = await isHodForUser(
+        hodId,
+        appraisal.user.departmentId ?? null,
+      );
       if (!allowed && !req.auth?.roles?.includes("SUPER_ADMIN")) {
         res.status(403).json({ success: false, message: "Access denied" });
         return;
@@ -435,10 +485,14 @@ router.put(
         return existing ? item.approvedPoints < existing.points : false;
       });
 
-      if (parsed.additionalPoints > 0 && !parsed.additionalPointsRemark?.trim()) {
+      if (
+        parsed.additionalPoints > 0 &&
+        !parsed.additionalPointsRemark?.trim()
+      ) {
         res.status(400).json({
           success: false,
-          message: "Additional points remark is required when extra points are granted",
+          message:
+            "Additional points remark is required when extra points are granted",
         });
         return;
       }
@@ -446,7 +500,10 @@ router.put(
       for (const reviewed of parsed.items) {
         const existing = byId.get(reviewed.itemId);
         if (!existing) {
-          res.status(400).json({ success: false, message: "Invalid item in review payload" });
+          res.status(400).json({
+            success: false,
+            message: "Invalid item in review payload",
+          });
           return;
         }
 
@@ -458,7 +515,10 @@ router.put(
           return;
         }
 
-        if (reviewed.approvedPoints < existing.points && !reviewed.remark?.trim()) {
+        if (
+          reviewed.approvedPoints < existing.points &&
+          !reviewed.remark?.trim()
+        ) {
           res.status(400).json({
             success: false,
             message: "Remark is required for each deducted criterion",
@@ -500,6 +560,23 @@ router.put(
           });
         }
 
+        const committees = await transaction.committee.findMany({
+          select: { id: true },
+        });
+
+        if (committees.length > 0) {
+          await transaction.committeeAssignment.deleteMany({
+            where: { appraisalId },
+          });
+
+          await transaction.committeeAssignment.createMany({
+            data: committees.map((committee) => ({
+              committeeId: committee.id,
+              appraisalId,
+            })),
+          });
+        }
+
         await transaction.appraisal.update({
           where: { id: appraisalId },
           data: {
@@ -510,7 +587,8 @@ router.put(
             hodRemarks: JSON.stringify({
               overallRemark: parsed.overallRemark?.trim() || null,
               additionalPoints: parsed.additionalPoints,
-              additionalPointsRemark: parsed.additionalPointsRemark?.trim() || null,
+              additionalPointsRemark:
+                parsed.additionalPointsRemark?.trim() || null,
               hasDeduction,
               reviewedBy: hodId,
               reviewedAt: new Date().toISOString(),
@@ -540,6 +618,305 @@ router.put(
           totalApprovedPoints: totalApproved,
           incrementPercent,
           forwardedStatus: "COMMITTEE_REVIEW",
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+// Committee review endpoints
+const committeeReviewSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        approvedPoints: z.number().int().min(0),
+        remark: z.string().optional(),
+      }),
+    )
+    .min(1),
+  overallRemark: z.string().optional(),
+});
+
+router.get(
+  "/committee/review-list",
+  authenticateRequest,
+  requireRoles("COMMITTEE", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const committeeId = req.auth?.sub;
+      if (!committeeId) {
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const committees = await prisma.committee.findMany({
+        where: {
+          members: {
+            some: { id: committeeId },
+          },
+        },
+        select: {
+          id: true,
+          assignments: {
+            select: {
+              appraisal: {
+                select: {
+                  id: true,
+                  status: true,
+                  submittedAt: true,
+                  finalScore: true,
+                  user: {
+                    select: {
+                      id: true,
+                      email: true,
+                      firstName: true,
+                      lastName: true,
+                      department: { select: { id: true, name: true } },
+                    },
+                  },
+                  cycle: {
+                    select: {
+                      id: true,
+                      name: true,
+                      startDate: true,
+                      endDate: true,
+                    },
+                  },
+                  items: {
+                    select: {
+                      id: true,
+                      key: true,
+                      points: true,
+                      notes: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const appraisals = committees
+        .flatMap((committee) =>
+          committee.assignments.map((assignment) => assignment.appraisal),
+        )
+        .filter(
+          (appraisal) =>
+            appraisal.status === "COMMITTEE_REVIEW" ||
+            appraisal.status === "HR_FINALIZED",
+        );
+
+      const payload = appraisals.map((appraisal) => ({
+        id: appraisal.id,
+        status: appraisal.status,
+        submittedAt: appraisal.submittedAt,
+        finalScore: appraisal.finalScore,
+        user: appraisal.user,
+        cycle: appraisal.cycle,
+        totalSelectedPoints: appraisal.items.reduce(
+          (sum, item) => sum + item.points,
+          0,
+        ),
+        itemsCount: appraisal.items.length,
+      }));
+
+      res.json({
+        success: true,
+        message: "Committee appraisal review list",
+        data: payload,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+router.put(
+  "/committee/requests/:appraisalId/review",
+  authenticateRequest,
+  requireRoles("COMMITTEE", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const committeeId = req.auth?.sub;
+      if (!committeeId) {
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const { appraisalId } = req.params;
+      const parsed = committeeReviewSchema.parse(req.body ?? {});
+
+      // Check if committee member is assigned to this appraisal
+      const assignment = await prisma.committeeAssignment.findFirst({
+        where: {
+          appraisalId,
+          committee: {
+            members: {
+              some: { id: committeeId },
+            },
+          },
+        },
+      });
+
+      if (!assignment) {
+        res.status(403).json({ success: false, message: "Access denied" });
+        return;
+      }
+
+      const appraisal = await prisma.appraisal.findUnique({
+        where: { id: appraisalId },
+        include: {
+          items: {
+            select: {
+              id: true,
+              key: true,
+              points: true,
+              notes: true,
+            },
+          },
+        },
+      });
+
+      if (!appraisal) {
+        res
+          .status(404)
+          .json({ success: false, message: "Appraisal not found" });
+        return;
+      }
+
+      if (appraisal.status !== "COMMITTEE_REVIEW") {
+        res.status(400).json({
+          success: false,
+          message: "Appraisal is not pending committee review",
+        });
+        return;
+      }
+
+      if (parsed.items.length !== appraisal.items.length) {
+        res.status(400).json({
+          success: false,
+          message: "Please review all criteria items before submitting",
+        });
+        return;
+      }
+
+      const byId = new Map(appraisal.items.map((item) => [item.id, item]));
+
+      // Validate all items have remarks if marks are deducted
+      for (const reviewed of parsed.items) {
+        const existing = byId.get(reviewed.itemId);
+        if (!existing) {
+          res.status(400).json({
+            success: false,
+            message: "Invalid item in review payload",
+          });
+          return;
+        }
+
+        // Parse existing to get HOD-approved points
+        let hodApprovedPoints = existing.points;
+        if (existing.notes) {
+          try {
+            const itemParsed = JSON.parse(existing.notes);
+            if (typeof itemParsed.hodReview?.approvedPoints === "number") {
+              hodApprovedPoints = itemParsed.hodReview.approvedPoints;
+            }
+          } catch {
+            // best effort
+          }
+        }
+
+        if (reviewed.approvedPoints > hodApprovedPoints) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Committee approved points cannot exceed HOD approved points",
+          });
+          return;
+        }
+
+        if (
+          reviewed.approvedPoints < hodApprovedPoints &&
+          !reviewed.remark?.trim()
+        ) {
+          res.status(400).json({
+            success: false,
+            message: "Remark is required for each deducted criterion",
+          });
+          return;
+        }
+      }
+
+      const totalApproved = parsed.items.reduce(
+        (sum, item) => sum + item.approvedPoints,
+        0,
+      );
+
+      await prisma.$transaction(async (transaction) => {
+        for (const reviewed of parsed.items) {
+          const existing = byId.get(reviewed.itemId);
+          if (!existing) {
+            continue;
+          }
+
+          const baseNotes = parseItemNotes(existing.notes);
+          const nextNotes = {
+            ...baseNotes,
+            committeeReview: {
+              approvedPoints: reviewed.approvedPoints,
+              remark: reviewed.remark?.trim() || null,
+              reviewedBy: committeeId,
+              reviewedAt: new Date().toISOString(),
+            },
+          };
+
+          await transaction.appraisalItem.update({
+            where: { id: reviewed.itemId },
+            data: {
+              points: reviewed.approvedPoints,
+              notes: JSON.stringify(nextNotes),
+            },
+          });
+        }
+
+        await transaction.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            status: "HR_FINALIZED",
+            finalScore: totalApproved,
+            committeeNotes: JSON.stringify({
+              overallRemark: parsed.overallRemark?.trim() || null,
+              reviewedBy: committeeId,
+              reviewedAt: new Date().toISOString(),
+            }),
+          },
+        });
+      });
+
+      await writeAuditLog({
+        actorId: committeeId,
+        action: "appraisal.committee.review.completed",
+        resource: "Appraisal",
+        resourceId: appraisalId,
+        meta: {
+          totalApproved,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "Appraisal reviewed successfully",
+        data: {
+          appraisalId,
+          totalApprovedPoints: totalApproved,
+          forwardedStatus: "HR_FINALIZED",
         },
       });
     } catch (error) {

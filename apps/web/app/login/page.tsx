@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@svgoi/zod-schemas";
 import { api } from "@/lib/api";
 import { resolvePostLoginPath } from "@/lib/faculty-access";
+import { getPrimaryRole, getRoleHomePath } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 
 export default function LoginPage() {
@@ -70,9 +71,7 @@ export default function LoginPage() {
       try {
         nextPath = await resolvePostLoginPath(response.data.user.roles);
       } catch {
-        nextPath = response.data.user.roles.includes("FACULTY")
-          ? "/profile?complete=1"
-          : "/";
+        nextPath = getRoleHomePath(getPrimaryRole(response.data.user.roles));
       }
       router.push(nextPath);
     } catch {
@@ -99,8 +98,7 @@ export default function LoginPage() {
           <div className="space-y-4">
             <p className="font-display text-4xl font-bold leading-tight text-white">
               Transparent appraisals.
-              <br /
-              >
+              <br />
               Meaningful growth.
             </p>
             <p className="max-w-lg text-base leading-7 text-slate-400">

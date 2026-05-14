@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import path from "path";
 import authRouter from "./routes/auth";
 import hodRouter from "./routes/hod";
+import hrRouter from "./routes/hr";
 import appraisalsRouter from "./routes/appraisals";
 import adminRouter from "./routes/admin";
 import facultyRouter from "./routes/faculty";
@@ -69,6 +70,7 @@ app.use("/api/v1/departments", departmentsRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/faculty", facultyRouter);
 app.use("/api/v1/hod", hodRouter);
+app.use("/api/v1/hr", hrRouter);
 app.use("/api/v1/appraisals", appraisalsRouter);
 app.use("/api/v1/uploads", uploadsRouter);
 

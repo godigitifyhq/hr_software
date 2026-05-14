@@ -67,7 +67,7 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
     title: "HR",
     items: [
       { label: "Overview", href: "/hr-dashboard", icon: LayoutDashboard },
-      { label: "Employees", href: "/hr-dashboard/employees", icon: Users },
+      { label: "Faculty", href: "/hr-dashboard/faculty", icon: Users },
       {
         label: "Departments",
         href: "/hr-dashboard/departments",
@@ -86,7 +86,7 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
     title: "Admin",
     items: [
       { label: "Overview", href: "/hr-dashboard", icon: LayoutDashboard },
-      { label: "Employees", href: "/hr-dashboard/employees", icon: Users },
+      { label: "Faculty", href: "/hr-dashboard/faculty", icon: Users },
       {
         label: "Departments",
         href: "/hr-dashboard/departments",
@@ -110,7 +110,7 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
     title: "Admin",
     items: [
       { label: "Overview", href: "/hr-dashboard", icon: LayoutDashboard },
-      { label: "Employees", href: "/hr-dashboard/employees", icon: Users },
+      { label: "Faculty", href: "/hr-dashboard/faculty", icon: Users },
       {
         label: "Departments",
         href: "/hr-dashboard/departments",

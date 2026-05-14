@@ -1,5 +1,8 @@
 import express from "express";
 import multer from "multer";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import type { AuthenticatedRequest } from "../middleware/rbac";
 import { authenticateRequest, requireRoles } from "../middleware/rbac";
@@ -26,6 +29,36 @@ const upload = multer({
 });
 
 const uploadSingle = upload.single("file");
+
+function sanitizeFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+async function saveFileToLocalUploads(input: {
+  moduleName: string;
+  ownerId: string;
+  originalName: string;
+  buffer: Buffer;
+}) {
+  const cleanName = sanitizeFileName(input.originalName || "upload.bin");
+  const uniqueName = `${Date.now()}-${randomUUID()}-${cleanName}`;
+  const relativeDir = path.join("uploads", input.moduleName, input.ownerId);
+  const absoluteDir = path.join(process.cwd(), relativeDir);
+  await fs.mkdir(absoluteDir, { recursive: true });
+
+  const relativePath = path.join(relativeDir, uniqueName);
+  const absolutePath = path.join(process.cwd(), relativePath);
+  await fs.writeFile(absolutePath, input.buffer);
+
+  const webPath = `/${relativePath.split(path.sep).join("/")}`;
+
+  return {
+    fileId: uniqueName,
+    folderId: `local:${input.moduleName}/${input.ownerId}`,
+    viewUrl: webPath,
+    directUrl: webPath,
+  };
+}
 
 function runUploadMiddleware(
   req: express.Request,
@@ -90,7 +123,7 @@ function parseMetadata(rawValue: unknown) {
 router.post(
   "/:module/:fieldKey",
   authenticateRequest,
-  requireRoles("FACULTY", "EMPLOYEE", "HOD", "SUPER_ADMIN"),
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
   async (req: AuthenticatedRequest, res, next) => {
     try {
       const userId = req.auth?.sub;
@@ -165,12 +198,10 @@ router.post(
           FACULTY_PROFILE_DOCUMENT_UPLOADS.map((entry) => entry.fieldKey),
         );
         if (!allowedFieldKeys.has(fieldKey as FacultyProfileDocumentFieldKey)) {
-          res
-            .status(400)
-            .json({
-              success: false,
-              message: "Invalid faculty document field",
-            });
+          res.status(400).json({
+            success: false,
+            message: "Invalid faculty document field",
+          });
           return;
         }
       }
@@ -181,23 +212,30 @@ router.post(
           ? req.body.label.trim()
           : validation.label;
       const originalName = file.originalname || displayName;
-      const uploaded = await uploadBufferToDrive({
-        fileName: originalName,
-        mimeType: file.mimetype,
-        buffer: file.buffer,
-        folderId:
-          moduleName === "faculty-profile"
-            ? process.env.GOOGLE_DRIVE_FACULTY_FOLDER_ID || undefined
-            : moduleName === APPRAISAL_EVIDENCE_UPLOAD_MODULE
-            ? process.env.GOOGLE_DRIVE_APPRAISAL_FOLDER_ID || undefined
-            : process.env.GOOGLE_DRIVE_FOLDER_ID || undefined,
-        description: `${moduleName}:${fieldKey}`,
-        appProperties: {
-          module: moduleName,
-          fieldKey,
-          ownerId: userId,
-        },
-      });
+
+      const uploaded =
+        moduleName === "faculty-profile"
+          ? await saveFileToLocalUploads({
+              moduleName,
+              ownerId: userId,
+              originalName,
+              buffer: file.buffer,
+            })
+          : await uploadBufferToDrive({
+              fileName: originalName,
+              mimeType: file.mimetype,
+              buffer: file.buffer,
+              folderId:
+                moduleName === APPRAISAL_EVIDENCE_UPLOAD_MODULE
+                  ? process.env.GOOGLE_DRIVE_APPRAISAL_FOLDER_ID || undefined
+                  : process.env.GOOGLE_DRIVE_FOLDER_ID || undefined,
+              description: `${moduleName}:${fieldKey}`,
+              appProperties: {
+                module: moduleName,
+                fieldKey,
+                ownerId: userId,
+              },
+            });
 
       const saved = await upsertUploadedDocument({
         ownerId: userId,
@@ -207,7 +245,16 @@ router.post(
         originalName,
         mime: file.mimetype,
         size: file.size,
-        drive: uploaded,
+        drive: {
+          driveFileId: uploaded.fileId,
+          viewUrl: uploaded.viewUrl,
+          directUrl: uploaded.directUrl,
+          folderId: uploaded.folderId,
+          mimeType: file.mimetype,
+          fileName: originalName,
+        },
+        storageProvider:
+          moduleName === "faculty-profile" ? "local" : "google-drive",
         metadataJson: metadata ?? undefined,
       });
 

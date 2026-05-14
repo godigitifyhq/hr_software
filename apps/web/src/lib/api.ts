@@ -259,25 +259,73 @@ export const api = {
   },
   committee: {
     getTeamAppraisals: () =>
-      unwrap<AppraisalSummary[]>(apiClient.get("/committee/review-list")),
-    submitReview: (id: string, data: { notes: string }) =>
+      unwrap<AppraisalSummary[]>(
+        apiClient.get("/appraisals/committee/review-list"),
+      ),
+    submitReview: (
+      id: string,
+      data: {
+        items: Array<{
+          itemId: string;
+          approvedPoints: number;
+          remark?: string;
+        }>;
+        overallRemark?: string;
+      },
+    ) =>
       unwrap<AppraisalSummary>(
-        apiClient.post(`/appraisals/${id}/committee-review`, data),
+        apiClient.put(`/hod/committee/requests/${id}/review`, data),
       ),
   },
   hr: {
-    getDashboardStats: () =>
-      unwrap<Record<string, unknown>>(
-        apiClient.get("/appraisals/hr/dashboard"),
+    getTeamAppraisals: () =>
+      unwrap<AppraisalSummary[]>(apiClient.get("/hr/review-list")),
+    getById: (id: string) =>
+      unwrap<AppraisalSummary>(apiClient.get(`/hr/requests/${id}`)),
+    submitReview: (
+      id: string,
+      data: {
+        items: Array<{
+          itemId: string;
+          approvedPoints: number;
+          remark?: string;
+        }>;
+        overallRemark?: string;
+      },
+    ) =>
+      unwrap<AppraisalSummary>(
+        apiClient.put(`/hr/requests/${id}/review`, data),
       ),
-    getAuditLogs: (params?: Record<string, string | number | undefined>) =>
-      unwrap<AuditLogEntry[]>(apiClient.get("/audit-logs", { params })),
-    getEmployees: () =>
-      unwrap<Record<string, unknown>>(apiClient.get("/users")),
-    getCycles: () =>
-      unwrap<Record<string, unknown>>(apiClient.get("/appraisal-cycles")),
-    getSubmissions: () =>
-      unwrap<Record<string, unknown>>(apiClient.get("/appraisals")),
+    getUsers: () =>
+      unwrap<Record<string, unknown>[]>(apiClient.get("/hr/users")),
+    createUser: (data: {
+      email: string;
+      password: string;
+      firstName: string;
+      lastName: string;
+      roles?: string[];
+      departmentId?: string;
+    }) =>
+      unwrap<{ id: string; email: string }>(apiClient.post(`/hr/users`, data)),
+    updateUser: (
+      id: string,
+      data: {
+        email?: string;
+        firstName?: string;
+        lastName?: string;
+        roles?: string[];
+        departmentId?: string;
+      },
+    ) =>
+      unwrap<{ id: string; email: string }>(
+        apiClient.put(`/hr/users/${id}`, data),
+      ),
+    blockUser: (id: string, until?: string) =>
+      unwrap<Record<string, unknown>>(
+        apiClient.put(`/hr/users/${id}/block`, { until }),
+      ),
+    unblockUser: (id: string) =>
+      unwrap<Record<string, unknown>>(apiClient.put(`/hr/users/${id}/unblock`)),
   },
   departments: {
     list: () => unwrap<DepartmentSummary[]>(apiClient.get("/departments")),
