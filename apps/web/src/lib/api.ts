@@ -35,6 +35,25 @@ export interface SessionUser {
   department?: { id: string; name: string } | null;
 }
 
+export interface HrUserSummary {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  departmentId?: string | null;
+  facultyProfile?: Record<string, unknown> | null;
+  documents?: Array<{
+    id: string;
+    name: string;
+    viewUrl?: string | null;
+    directUrl?: string | null;
+    module?: string | null;
+    fieldKey?: string | null;
+  }>;
+  roles: Array<{ role: string }>;
+  lockedUntil?: string | null;
+}
+
 export interface AuthResponse {
   accessToken: string;
   user: SessionUser;
@@ -77,6 +96,94 @@ export interface AppraisalSummary {
   cycle?: AppraisalCycleSummary;
   user?: SessionUser & { department?: { id: string; name: string } | null };
   items?: AppraisalItemSummary[];
+}
+
+export interface HrAppraisalSummary {
+  id: string;
+  status: string;
+  submittedAt: string | null;
+  finalScore: number | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    department: { id: string; name: string } | null;
+  };
+  cycle: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+  };
+  totalSelectedPoints: number;
+  itemsCount: number;
+  finalPercent: number | null;
+  currentSalary: number;
+  superAdminApprovedPercent: number | null;
+}
+
+export interface SuperAdminAppraisalDetail {
+  id: string;
+  status: string;
+  finalScore: number | null;
+  finalPercent: number;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    departmentId?: string | null;
+    department?: { id: string; name: string } | null;
+    facultyProfile?: {
+      currentSalary?: number;
+      lastIncrementDate?: string;
+    } | null;
+  };
+  cycle: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+  };
+  items: Array<{
+    id: string;
+    key: string;
+    points: number;
+    notes?: string;
+  }>;
+  currentSalary: number;
+  revisedSalary: number;
+  superAdminApprovedPercent?: number | null;
+  superAdminRemark?: string | null;
+}
+
+export interface SuperAdminAppraisalSummary {
+  id: string;
+  status: string;
+  submittedAt: string | null;
+  finalScore: number | null;
+  finalPercent: number | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    departmentId?: string | null;
+    department?: { id: string; name: string } | null;
+    facultyProfile?: {
+      currentSalary?: number;
+    } | null;
+  };
+  cycle: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+  };
+  currentSalary: number;
+  totalSelectedPoints: number;
+  itemsCount: number;
 }
 
 export interface FacultyAppraisalItemDetail {
@@ -305,9 +412,9 @@ export const api = {
   },
   hr: {
     getTeamAppraisals: () =>
-      unwrap<AppraisalSummary[]>(apiClient.get("/hr/review-list")),
+      unwrap<HrAppraisalSummary[]>(apiClient.get("/hr/review-list")),
     getApprovedAppraisals: () =>
-      unwrap<AppraisalSummary[]>(apiClient.get("/hr/approved-list")),
+      unwrap<HrAppraisalSummary[]>(apiClient.get("/hr/approved-list")),
     getById: (id: string) =>
       unwrap<AppraisalSummary>(apiClient.get(`/hr/requests/${id}`)),
     submitReview: (
@@ -324,8 +431,7 @@ export const api = {
       unwrap<AppraisalSummary>(
         apiClient.put(`/hr/requests/${id}/review`, data),
       ),
-    getUsers: () =>
-      unwrap<Record<string, unknown>[]>(apiClient.get("/hr/users")),
+    getUsers: () => unwrap<HrUserSummary[]>(apiClient.get("/hr/users")),
     createUser: (data: {
       email: string;
       password: string;
@@ -429,14 +535,16 @@ export const api = {
         query.append("departmentId", params.departmentId);
       if (params?.status) query.append("status", params.status);
       const queryString = query.toString();
-      return unwrap<AppraisalSummary[]>(
+      return unwrap<SuperAdminAppraisalSummary[]>(
         apiClient.get(
           `/admin/appraisals${queryString ? `?${queryString}` : ""}`,
         ),
       );
     },
     getById: (id: string) =>
-      unwrap<AppraisalSummary>(apiClient.get(`/admin/appraisals/${id}`)),
+      unwrap<SuperAdminAppraisalDetail>(
+        apiClient.get(`/admin/appraisals/${id}`),
+      ),
     approve: (
       id: string,
       data: {

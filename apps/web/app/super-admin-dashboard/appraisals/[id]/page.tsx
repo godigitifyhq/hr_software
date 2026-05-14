@@ -17,7 +17,7 @@ function fullEvidenceUrl(url: string) {
 interface AppraisalDetail {
   id: string;
   status: string;
-  finalScore: number;
+  finalScore: number | null;
   finalPercent: number;
   currentSalary: number;
   revisedSalary: number;
@@ -44,8 +44,8 @@ interface AppraisalDetail {
     points: number;
     notes?: string;
   }>;
-  superAdminApprovedPercent?: number;
-  superAdminRemark?: string;
+  superAdminApprovedPercent?: number | null;
+  superAdminRemark?: string | null;
 }
 
 function SuperAdminAppraisalDetail() {

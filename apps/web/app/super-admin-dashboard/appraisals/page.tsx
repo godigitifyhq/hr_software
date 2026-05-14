@@ -15,11 +15,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
-import type { AppraisalSummary } from "@/lib/api";
+import type { SuperAdminAppraisalSummary } from "@/lib/api";
 
-interface AppraisalWithSalary extends AppraisalSummary {
-  currentSalary?: number;
-}
+type AppraisalWithSalary = SuperAdminAppraisalSummary;
 
 function SuperAdminAppraislalsPage() {
   const router = useRouter();

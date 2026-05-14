@@ -56,6 +56,19 @@ const allowedEvidenceTypes: Record<string, string> = {
   "application/pdf": ".pdf",
 };
 
+function parseItemNotes(notes: string | null): Record<string, unknown> {
+  if (!notes) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(notes) as Record<string, unknown>;
+    return parsed ?? {};
+  } catch {
+    return {};
+  }
+}
+
 const baseCriteria: PolicyCriterion[] = [
   {
     key: "academics_average_result",
@@ -816,14 +829,7 @@ router.get(
 
       // Parse item notes to extract selection and evidence
       const items = appraisal.items.map((item) => {
-        let parsed = {};
-        if (item.notes) {
-          try {
-            parsed = JSON.parse(item.notes);
-          } catch {
-            // best effort
-          }
-        }
+        const parsed = parseItemNotes(item.notes);
 
         const hodReview =
           typeof parsed.hodReview === "object" && parsed.hodReview

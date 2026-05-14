@@ -27,11 +27,17 @@ router.get("/:id", async (req, res, next) => {
     }
 
     // Forward relevant headers
-    const contentType =
-      response.headers["content-type"] || "application/octet-stream";
-    if (contentType) res.setHeader("Content-Type", contentType);
+    const contentType = response.headers["content-type"];
+    if (contentType) {
+      res.setHeader("Content-Type", String(contentType));
+    } else {
+      res.setHeader("Content-Type", "application/octet-stream");
+    }
     if (response.headers["content-length"]) {
-      res.setHeader("Content-Length", response.headers["content-length"]);
+      res.setHeader(
+        "Content-Length",
+        String(response.headers["content-length"]),
+      );
     }
     // Cache for an hour
     res.setHeader("Cache-Control", "public, max-age=3600");

@@ -52,6 +52,18 @@ type CommitteeAppraisalDetail = {
   committeeNotes?: string | null;
 };
 
+type CommitteeAppraisalDetailResponse = Omit<
+  CommitteeAppraisalDetail,
+  "items"
+> & {
+  items: Array<{
+    id: string;
+    key: string;
+    points: number;
+    notes?: string | null;
+  }>;
+};
+
 type ItemState = {
   approvedPoints: number;
   remark: string;
@@ -173,14 +185,8 @@ function CommitteeReviewPage() {
         setLoading(true);
         setError(null);
         const response = await api.appraisals.getById(appraisalId);
-        const payload = response.data as unknown as CommitteeAppraisalDetail & {
-          items: Array<{
-            id: string;
-            key: string;
-            points: number;
-            notes?: string | null;
-          }>;
-        };
+        const payload =
+          response.data as unknown as CommitteeAppraisalDetailResponse;
 
         const nextItems = payload.items.map((item) => {
           const parsed = parseItemNotes(item.notes);
