@@ -104,15 +104,27 @@ model UserRole {
 }
 
 model Document {
-  id         String   @id @default(uuid())
-  owner      User     @relation(fields: [ownerId], references: [id])
-  ownerId    String
-  name       String
-  mime       String
-  size       Int
-  driveId    String?  // reference to Google Drive file id
-  uploadedAt DateTime @default(now())
-  deletedAt  DateTime?
+  id              String   @id @default(uuid())
+  owner           User     @relation(fields: [ownerId], references: [id])
+  ownerId         String
+  module          String
+  fieldKey        String
+  name            String
+  originalName    String
+  mime            String
+  size            Int
+  driveId         String?  // reference to Google Drive file id
+  viewUrl         String?
+  directUrl       String?
+  folderId        String?
+  storageProvider String   @default("google-drive")
+  metadataJson    Json?
+  uploadedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  @@unique([ownerId, module, fieldKey])
+  @@index([ownerId, module])
 }
 
 model RefreshToken {

@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { decryptSensitiveValue, encryptSensitiveValue } from "./security";
+import {
+  FACULTY_PROFILE_DOCUMENT_UPLOADS,
+  type FacultyDocumentSummary,
+} from "./facultyDocuments";
 
 type UserProfileRecord = {
   id: string;
@@ -32,6 +36,23 @@ type UserProfileRecord = {
     createdAt: Date;
     updatedAt: Date;
   } | null;
+  documents?: Array<{
+    id: string;
+    module: string;
+    fieldKey: string;
+    name: string;
+    originalName: string;
+    mime: string;
+    size: number;
+    driveId: string | null;
+    viewUrl: string | null;
+    directUrl: string | null;
+    folderId: string | null;
+    storageProvider: string | null;
+    uploadedAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
+  }>;
 };
 
 export const facultyUploadDir = path.join(
@@ -56,10 +77,39 @@ function hasText(value: string | null | undefined) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function hasDocumentForField(
+  documents: NonNullable<UserProfileRecord["documents"]> | undefined,
+  fieldKey: string,
+) {
+  return Boolean(
+    documents?.some(
+      (document) =>
+        document.deletedAt == null &&
+        document.fieldKey === fieldKey &&
+        document.module === "faculty-profile",
+    ),
+  );
+}
+
+function getDocumentForField(
+  documents: NonNullable<UserProfileRecord["documents"]> | undefined,
+  fieldKey: string,
+) {
+  return documents?.find(
+    (document) =>
+      document.deletedAt == null &&
+      document.fieldKey === fieldKey &&
+      document.module === "faculty-profile",
+  );
+}
+
 export function isFacultyProfileComplete(user: UserProfileRecord): boolean {
   const profile = user.facultyProfile;
-  const pan = decryptOptional(profile?.panEncrypted ?? null);
-  const aadhar = decryptOptional(profile?.aadharEncrypted ?? null);
+  const documents = user.documents ?? [];
+
+  const requiredDocumentKeys = FACULTY_PROFILE_DOCUMENT_UPLOADS.filter(
+    (document) => document.required,
+  ).map((document) => document.fieldKey);
 
   return Boolean(
     hasText(user.firstName) &&
@@ -70,14 +120,13 @@ export function isFacultyProfileComplete(user: UserProfileRecord): boolean {
       user.departmentId &&
       typeof profile?.currentSalary === "number" &&
       profile?.lastIncrementDate &&
-      hasText(pan) &&
-      hasText(aadhar) &&
       typeof profile?.tenthMarks === "number" &&
       typeof profile?.twelfthMarks === "number" &&
-      hasText(profile?.qualification) &&
-      hasText(profile?.graduation) &&
-      hasText(profile?.imageUrl) &&
-      typeof profile?.totalExperience === "number",
+      typeof profile?.totalExperience === "number" &&
+      requiredDocumentKeys.every((fieldKey) =>
+        hasDocumentForField(documents, fieldKey),
+      ) &&
+      hasDocumentForField(documents, "profilePicture"),
   );
 }
 
@@ -85,6 +134,29 @@ export function serializeFacultyProfile(user: UserProfileRecord) {
   const profile = user.facultyProfile;
   const pan = decryptOptional(profile?.panEncrypted ?? null);
   const aadhar = decryptOptional(profile?.aadharEncrypted ?? null);
+  const documents = (user.documents ?? [])
+    .filter(
+      (document) =>
+        document.deletedAt == null && document.module === "faculty-profile",
+    )
+    .map((document) => ({
+      id: document.id,
+      module: document.module,
+      fieldKey: document.fieldKey,
+      name: document.name,
+      originalName: document.originalName,
+      mime: document.mime,
+      size: document.size,
+      driveId: document.driveId,
+      viewUrl: document.viewUrl,
+      directUrl: document.directUrl,
+      folderId: document.folderId,
+      storageProvider: document.storageProvider,
+      uploadedAt: document.uploadedAt.toISOString(),
+      updatedAt: document.updatedAt.toISOString(),
+      deletedAt: document.deletedAt ? document.deletedAt.toISOString() : null,
+    }));
+  const profilePicture = getDocumentForField(user.documents, "profilePicture");
 
   return {
     userId: user.id,
@@ -101,20 +173,22 @@ export function serializeFacultyProfile(user: UserProfileRecord) {
     graduation: profile?.graduation ?? null,
     postGraduation: profile?.postGraduation ?? null,
     phdDegree: profile?.phdDegree ?? null,
-    imageUrl: profile?.imageUrl ?? null,
+    imageUrl:
+      profile?.imageUrl ??
+      profilePicture?.directUrl ??
+      profilePicture?.viewUrl ??
+      null,
     totalExperience: profile?.totalExperience ?? null,
     departmentId: user.departmentId,
     department: user.department,
+    documents,
     isProfileComplete: isFacultyProfileComplete(user),
     createdAt: profile?.createdAt.toISOString(),
     updatedAt: profile?.updatedAt.toISOString(),
   };
 }
 
-export function encryptFacultyIdentity(input: {
-  pan: string;
-  aadhar: string;
-}) {
+export function encryptFacultyIdentity(input: { pan: string; aadhar: string }) {
   return {
     panEncrypted: encryptSensitiveValue(input.pan.trim()),
     aadharEncrypted: encryptSensitiveValue(input.aadhar.trim()),

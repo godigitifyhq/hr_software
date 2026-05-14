@@ -8,16 +8,16 @@ export const facultyProfileSchema = z.object({
   dateOfJoining: z.string().min(1, "Date of joining is required"),
   currentSalary: numericString.min(0, "Current salary is required"),
   lastIncrementDate: z.string().min(1, "Last increment date is required"),
-  pan: z.string().trim().min(1, "PAN is required"),
-  aadhar: z.string().trim().min(1, "Aadhaar is required"),
   tenthMarks: numericString.min(0, "10th marks are required"),
   twelfthMarks: numericString.min(0, "12th marks are required"),
-  qualification: z.string().trim().min(1, "Qualification is required"),
-  graduation: z.string().trim().min(1, "Graduation is required"),
-  postGraduation: z.string().trim().optional().nullable(),
-  phdDegree: z.string().trim().optional().nullable(),
   totalExperience: numericString.min(0, "Total experience is required"),
   departmentId: z.string().uuid("Department is required"),
+  pan: z.string().trim().optional().nullable(),
+  aadhar: z.string().trim().optional().nullable(),
+  qualification: z.string().trim().optional().nullable(),
+  graduation: z.string().trim().optional().nullable(),
+  postGraduation: z.string().trim().optional().nullable(),
+  phdDegree: z.string().trim().optional().nullable(),
 });
 
 export type FacultyProfileInput = z.infer<typeof facultyProfileSchema>;

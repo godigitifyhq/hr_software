@@ -144,7 +144,11 @@ const baseCriteria: PolicyCriterion[] = [
           "Online course certificate like Symposium / MOOC etc / STP in campus or outside campus",
         points: 3,
       },
-      { value: "mooc_developed", label: "MOOC developed by faculty", points: 4 },
+      {
+        value: "mooc_developed",
+        label: "MOOC developed by faculty",
+        points: 4,
+      },
     ],
   },
   {
@@ -153,7 +157,11 @@ const baseCriteria: PolicyCriterion[] = [
     options: [
       { value: "between_10000_50000", label: "10,000 to 50,000", points: 1 },
       { value: "between_51000_100000", label: "51,000 to 1,00,000", points: 2 },
-      { value: "between_100000_200000", label: "1,00,000 to 2,00,000", points: 3 },
+      {
+        value: "between_100000_200000",
+        label: "1,00,000 to 2,00,000",
+        points: 3,
+      },
       { value: "above_200000", label: "Above 2 Lakh", points: 4 },
     ],
   },
@@ -184,7 +192,11 @@ const baseCriteria: PolicyCriterion[] = [
         label: "Participate in institutional events",
         points: 1,
       },
-      { value: "coordinator_team_leader", label: "Coordinator / Team Leader", points: 2 },
+      {
+        value: "coordinator_team_leader",
+        label: "Coordinator / Team Leader",
+        points: 2,
+      },
       {
         value: "overall_coordinator",
         label: "Overall Coordinator / Organizer",
@@ -239,7 +251,11 @@ const hodOnlyCriteria: PolicyCriterion[] = [
     key: "fee_recovery",
     heading: "XIII. Fee Recovery",
     options: [
-      { value: "fifty_percent_next_sem", label: "50% fee of next semester", points: 1 },
+      {
+        value: "fifty_percent_next_sem",
+        label: "50% fee of next semester",
+        points: 1,
+      },
       { value: "between_50_70", label: "50% to 70%", points: 2 },
       { value: "between_70_80", label: "70% to 80%", points: 3 },
       { value: "greater_than_80", label: "Greater than 80%", points: 4 },
@@ -260,7 +276,11 @@ const hodOnlyCriteria: PolicyCriterion[] = [
     key: "overall_university_result",
     heading: "XV. Overall University Result",
     options: [
-      { value: "thirty_percent", label: "30% student intake all clear", points: 1 },
+      {
+        value: "thirty_percent",
+        label: "30% student intake all clear",
+        points: 1,
+      },
       { value: "fifty_percent", label: "50%", points: 2 },
       { value: "seventy_percent", label: "70%", points: 3 },
       { value: "eighty_percent", label: "80%", points: 4 },
@@ -270,7 +290,11 @@ const hodOnlyCriteria: PolicyCriterion[] = [
     key: "placement",
     heading: "XVI. Placement",
     options: [
-      { value: "thirty_percent", label: "30% placement of passed students", points: 1 },
+      {
+        value: "thirty_percent",
+        label: "30% placement of passed students",
+        points: 1,
+      },
       { value: "between_30_50", label: "30 to 50%", points: 2 },
       { value: "between_50_70", label: "50 to 70%", points: 3 },
       { value: "more_than_70", label: "More than 70%", points: 4 },
@@ -278,12 +302,25 @@ const hodOnlyCriteria: PolicyCriterion[] = [
   },
   {
     key: "department_university_positions",
-    heading: "XVII. Position Earned by Department Students in University Academics",
+    heading:
+      "XVII. Position Earned by Department Students in University Academics",
     options: [
       { value: "between_0_5_students", label: "0 - 5 students", points: 1 },
-      { value: "three_percent_students", label: "3% of total students", points: 2 },
-      { value: "five_percent_students", label: "5% of total students", points: 3 },
-      { value: "above_10_percent_students", label: "Above 10% students", points: 4 },
+      {
+        value: "three_percent_students",
+        label: "3% of total students",
+        points: 2,
+      },
+      {
+        value: "five_percent_students",
+        label: "5% of total students",
+        points: 3,
+      },
+      {
+        value: "above_10_percent_students",
+        label: "Above 10% students",
+        points: 4,
+      },
     ],
   },
 ];
@@ -315,13 +352,12 @@ function policyForRoles(roles: string[] = []): AppraisalPolicy {
 }
 
 function criteriaMap(policy: AppraisalPolicy) {
-  return new Map(policy.criteria.map((criterion) => [criterion.key, criterion]));
+  return new Map(
+    policy.criteria.map((criterion) => [criterion.key, criterion]),
+  );
 }
 
-function calculateIncrement(
-  totalPoints: number,
-  policy: AppraisalPolicy,
-) {
+function calculateIncrement(totalPoints: number, policy: AppraisalPolicy) {
   const bracket = policy.incrementBrackets.find((entry) => {
     const lower = totalPoints >= entry.min;
     const upper =
@@ -359,6 +395,26 @@ function getProfileUser(userId: string) {
         },
       },
       facultyProfile: true,
+      documents: {
+        select: {
+          id: true,
+          module: true,
+          fieldKey: true,
+          name: true,
+          originalName: true,
+          mime: true,
+          size: true,
+          driveId: true,
+          viewUrl: true,
+          directUrl: true,
+          folderId: true,
+          storageProvider: true,
+          uploadedAt: true,
+          updatedAt: true,
+          deletedAt: true,
+        },
+        orderBy: { uploadedAt: "desc" },
+      },
     },
   });
 }
@@ -399,7 +455,9 @@ router.get(
     try {
       const userId = req.auth?.sub;
       if (!userId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -428,7 +486,9 @@ router.put(
     try {
       const userId = req.auth?.sub;
       if (!userId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -512,7 +572,9 @@ router.post(
     try {
       const userId = req.auth?.sub;
       if (!userId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -591,7 +653,9 @@ router.get(
     try {
       const userId = req.auth?.sub;
       if (!userId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -649,7 +713,9 @@ router.post(
     try {
       const userId = req.auth?.sub;
       if (!userId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -658,7 +724,9 @@ router.post(
 
       const criterionKey = req.params.criterionKey;
       if (!criteriaByKey.has(criterionKey)) {
-        res.status(400).json({ success: false, message: "Invalid criterion key" });
+        res
+          .status(400)
+          .json({ success: false, message: "Invalid criterion key" });
         return;
       }
 
@@ -682,17 +750,17 @@ router.post(
       const originalFileName = req.get("x-file-name") || "evidence";
 
       if (!extension || !Buffer.isBuffer(body) || body.length === 0) {
-        res.status(400).json({ success: false, message: "Invalid evidence file" });
+        res
+          .status(400)
+          .json({ success: false, message: "Invalid evidence file" });
         return;
       }
 
       await ensureEvidenceUploadDir();
       const sanitizedName = sanitizeFileName(originalFileName);
-      const fileName = `${userId}-${criterionKey}-${Date.now()}-${sanitizedName}${path.extname(
-        sanitizedName,
-      )
-        ? ""
-        : extension}`;
+      const fileName = `${userId}-${criterionKey}-${Date.now()}-${sanitizedName}${
+        path.extname(sanitizedName) ? "" : extension
+      }`;
       const filePath = path.join(getEvidenceUploadDir(), fileName);
       await fs.writeFile(filePath, body);
 
@@ -723,7 +791,9 @@ router.post(
     try {
       const userId = req.auth?.sub;
       if (!userId) {
-        res.status(401).json({ success: false, message: "Authentication required" });
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
         return;
       }
 
@@ -744,10 +814,7 @@ router.post(
       const policy = policyForRoles(req.auth?.roles || []);
       const criteriaByKey = criteriaMap(policy);
       const parsed = facultyAppraisalRequestSchema.parse(req.body);
-      const selectedByKey = new Map<
-        string,
-        (typeof parsed.items)[number]
-      >();
+      const selectedByKey = new Map<string, (typeof parsed.items)[number]>();
       parsed.items.forEach((entry) => {
         selectedByKey.set(entry.criterionKey, entry);
       });
@@ -801,7 +868,10 @@ router.post(
         };
       });
 
-      const totalPoints = appraisalItems.reduce((sum, item) => sum + item.points, 0);
+      const totalPoints = appraisalItems.reduce(
+        (sum, item) => sum + item.points,
+        0,
+      );
       const incrementPercent = calculateIncrement(totalPoints, policy);
 
       const appraisalId =

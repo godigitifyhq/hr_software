@@ -20,11 +20,13 @@ DATABASE_URL=postgresql://user:password@host:5432/database
 **Format**: PostgreSQL connection string
 
 **For Supabase**:
+
 ```
 DATABASE_URL=postgresql://postgres:<password>@<region>.pooler.supabase.com:5432/postgres
 ```
 
 **For Neon** (recommended for serverless):
+
 ```
 DATABASE_URL=postgresql://user:password@<project>.neon.tech/database?sslmode=require
 ```
@@ -32,26 +34,31 @@ DATABASE_URL=postgresql://user:password@<project>.neon.tech/database?sslmode=req
 ## Authentication
 
 ### JWT Configuration
+
 ```
 JWT_SECRET=<base64-encoded-32-byte-secret>
 ```
 
 Generate with:
+
 ```bash
 openssl rand -base64 32
 ```
 
 ### AES Encryption Key
+
 ```
 AES_KEY=<base64-encoded-32-byte-key>
 ```
 
 Generate with:
+
 ```bash
 openssl rand -base64 32
 ```
 
-**Usage**: 
+**Usage**:
+
 - Signs JWT tokens for access control
 - Encrypts sensitive data (passwords, reset tokens)
 - Must be kept secure and rotated periodically
@@ -69,6 +76,7 @@ EMAIL_FROM_ADDRESS=noreply@svgoi-appraisal.com
 ```
 
 **Gmail Setup**:
+
 1. Enable 2-Factor Authentication
 2. Generate App Password: https://myaccount.google.com/apppasswords
 3. Use app password in `EMAIL_SMTP_PASS`
@@ -81,6 +89,7 @@ FRONTEND_URL=http://localhost:3000
 ```
 
 **Production values**:
+
 ```
 NEXT_PUBLIC_API_URL=https://api-svgoi.vercel.app/api/v1
 FRONTEND_URL=https://svgoi-appraisal.vercel.app
@@ -118,16 +127,43 @@ REDIS_URL=redis://localhost:6379
 
 For caching and session management.
 
-## Optional: File Storage (Future)
+## Google Drive Upload Storage
+
+Faculty profile documents and appraisal evidence are stored in Google Drive and tracked in Prisma as `Document` rows.
+
+### Required Variables
 
 ```
-GOOGLE_DRIVE_API_KEY=<google-cloud-api-key>
 GOOGLE_DRIVE_FOLDER_ID=<parent-folder-id>
+GOOGLE_DRIVE_CLIENT_EMAIL=<service-account-email>
+GOOGLE_DRIVE_PRIVATE_KEY=<service-account-private-key>
 ```
+
+You can also provide the service account as one JSON blob instead of separate keys:
+
+```
+GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON={"client_email":"...","private_key":"..."}
+```
+
+### Setup Steps
+
+1. Enable the Google Drive API in your Google Cloud project.
+2. Create a service account for the app and download its credentials.
+3. Share the target Drive folder with the service account email as a reader/editor.
+4. Copy the folder ID from the Drive URL into `GOOGLE_DRIVE_FOLDER_ID`.
+5. Set either `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` or the `GOOGLE_DRIVE_CLIENT_EMAIL` and `GOOGLE_DRIVE_PRIVATE_KEY` pair.
+6. Restart the API server after changing the variables.
+
+### Notes
+
+- The backend uses the folder ID as the default upload destination for faculty profile and appraisal documents.
+- The service account must have permission to create files in the target folder.
+- Private keys from `.env` files usually need escaped newlines, and the backend normalizes `\n` to real newlines at runtime.
 
 ## Development vs Production
 
 ### Development
+
 ```bash
 NODE_ENV=development
 DATABASE_URL=postgresql://user:password@localhost:5432/appraisal
@@ -136,6 +172,7 @@ FRONTEND_URL=http://localhost:3000
 ```
 
 ### Production (Vercel)
+
 ```bash
 NODE_ENV=production
 DATABASE_URL=postgresql://postgres:password@region.pooler.supabase.com:5432/postgres

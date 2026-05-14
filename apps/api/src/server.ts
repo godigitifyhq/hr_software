@@ -11,10 +11,9 @@ import appraisalsRouter from "./routes/appraisals";
 import adminRouter from "./routes/admin";
 import facultyRouter from "./routes/faculty";
 import departmentsRouter from "./routes/departments";
-import { ensureFacultyUploadDir } from "./lib/facultyProfile";
+import uploadsRouter from "./routes/uploads";
 
 dotenv.config();
-ensureFacultyUploadDir();
 
 const app: express.Express = express();
 app.set("trust proxy", 1);
@@ -71,6 +70,7 @@ app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/faculty", facultyRouter);
 app.use("/api/v1/hod", hodRouter);
 app.use("/api/v1/appraisals", appraisalsRouter);
+app.use("/api/v1/uploads", uploadsRouter);
 
 // Basic error handler
 app.use(
