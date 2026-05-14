@@ -33,6 +33,54 @@ const hrReviewSchema = z.object({
   overallRemark: z.string().optional(),
 });
 
+type HrAppraisalSummary = {
+  id: string;
+  status: string;
+  submittedAt: Date | null;
+  finalScore: number | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    department: { id: string; name: string } | null;
+  };
+  cycle: {
+    id: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+  };
+  totalSelectedPoints: number;
+  itemsCount: number;
+  finalPercent: number | null;
+  currentSalary: number;
+  superAdminApprovedPercent: number | null;
+};
+
+function mapHrAppraisal(appraisal: any): HrAppraisalSummary {
+  const totalSelectedPoints = appraisal.items.reduce(
+    (sum: number, item: { points: number }) => sum + item.points,
+    0,
+  );
+  const currentSalary = appraisal.user.facultyProfile?.currentSalary ?? 0;
+  const superAdminApprovedPercent = appraisal.superAdminApprovedPercent ?? null;
+
+  return {
+    id: appraisal.id,
+    status: appraisal.status,
+    submittedAt: appraisal.submittedAt,
+    finalScore: appraisal.finalScore,
+    user: appraisal.user,
+    cycle: appraisal.cycle,
+    totalSelectedPoints,
+    itemsCount: appraisal.items.length,
+    finalPercent: appraisal.finalPercent ?? null,
+    currentSalary,
+    superAdminApprovedPercent,
+  };
+}
+
 // List appraisals ready for HR (HR_FINALIZED)
 router.get(
   "/review-list",
@@ -53,6 +101,9 @@ router.get(
               firstName: true,
               lastName: true,
               department: { select: { id: true, name: true } },
+              facultyProfile: {
+                select: { currentSalary: true },
+              },
             },
           },
           items: { select: { id: true, key: true, points: true, notes: true } },
@@ -60,20 +111,54 @@ router.get(
         orderBy: { submittedAt: "desc" },
       });
 
-      const payload = appraisals.map((appraisal) => ({
-        id: appraisal.id,
-        status: appraisal.status,
-        submittedAt: appraisal.submittedAt,
-        finalScore: appraisal.finalScore,
-        user: appraisal.user,
-        cycle: appraisal.cycle,
-        totalSelectedPoints: appraisal.items.reduce((s, i) => s + i.points, 0),
-        itemsCount: appraisal.items.length,
-      }));
+      const payload = appraisals.map((appraisal) => mapHrAppraisal(appraisal));
 
       res.json({
         success: true,
         message: "HR appraisal review list",
+        data: payload,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// List fully approved appraisals for HR salary sync
+router.get(
+  "/approved-list",
+  authenticateRequest,
+  requireRoles("HR", "SUPER_ADMIN"),
+  async (_req: AuthenticatedRequest, res, next) => {
+    try {
+      const appraisals = await prisma.appraisal.findMany({
+        where: { status: "FULLY_APPROVED" },
+        include: {
+          cycle: {
+            select: { id: true, name: true, startDate: true, endDate: true },
+          },
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              department: { select: { id: true, name: true } },
+              facultyProfile: {
+                select: { currentSalary: true },
+              },
+            },
+          },
+          items: { select: { id: true, key: true, points: true, notes: true } },
+        },
+        orderBy: { submittedAt: "desc" },
+      });
+
+      const payload = appraisals.map((appraisal) => mapHrAppraisal(appraisal));
+
+      res.json({
+        success: true,
+        message: "HR approved appraisal list",
         data: payload,
       });
     } catch (error) {
@@ -327,7 +412,7 @@ router.put(
         await transaction.appraisal.update({
           where: { id: appraisalId },
           data: {
-            status: "CLOSED",
+            status: "SUPER_ADMIN_PENDING",
             finalScore: totalApproved,
           },
         });

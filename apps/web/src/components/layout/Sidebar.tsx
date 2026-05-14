@@ -109,7 +109,8 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
   SUPER_ADMIN: {
     title: "Admin",
     items: [
-      { label: "Overview", href: "/hr-dashboard", icon: LayoutDashboard },
+      { label: "Overview", href: "/super-admin-dashboard", icon: LayoutDashboard },
+      { label: "Appraisals", href: "/super-admin-dashboard/appraisals", icon: ClipboardList },
       { label: "Faculty", href: "/hr-dashboard/faculty", icon: Users },
       {
         label: "Departments",
@@ -172,7 +173,11 @@ export function Sidebar({
         collapsed ? "w-14" : "w-60"
       }`}
     >
-      <div className="flex h-14 items-center justify-between border-b border-border px-4">
+      <div
+        className={`flex h-14 items-center justify-between border-b border-border ${
+          collapsed ? "px-2" : "px-4"
+        }`}
+      >
         <div
           className={`flex items-center gap-2 ${
             collapsed ? "opacity-0 pointer-events-none" : "opacity-100"
@@ -185,18 +190,16 @@ export function Sidebar({
             {nav.title}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={toggle}
-          className="rounded-lg border border-border bg-surface-2 p-1.5 text-text-2 transition hover:bg-surface-3"
-          aria-label="Toggle sidebar"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={toggle}
+            className="flex items-center justify-center rounded-lg border border-brand/50 bg-brand-light p-1.5 text-brand transition hover:bg-brand hover:text-white"
+            aria-label="Collapse sidebar"
+          >
             <ChevronLeft className="h-4 w-4" />
-          )}
-        </button>
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
@@ -230,6 +233,17 @@ export function Sidebar({
           })}
         </div>
       </nav>
+
+      {collapsed && (
+        <button
+          type="button"
+          onClick={toggle}
+          className="mx-2 mb-3 flex h-10 items-center justify-center rounded-lg border-2 border-brand bg-brand-light text-brand transition hover:bg-brand hover:text-white"
+          aria-label="Expand sidebar"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      )}
     </aside>
   );
 }

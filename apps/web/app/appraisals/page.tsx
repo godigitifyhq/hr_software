@@ -24,6 +24,11 @@ function AppraisalsPage() {
   const [appraisals, setAppraisals] = useState<AppraisalCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeCycleInfo, setActiveCycleInfo] = useState<{
+    hasRequest: boolean;
+    status?: string;
+    cycle?: { name: string; endDate?: string };
+  } | null>(null);
 
   const role = getPrimaryRole(session?.user.roles ?? []);
 
@@ -31,6 +36,15 @@ function AppraisalsPage() {
     try {
       setLoading(true);
       setError(null);
+
+      // Load faculty appraisal status to get active cycle info
+      try {
+        const statusResponse = await api.faculty.getAppraisalStatus();
+        setActiveCycleInfo(statusResponse.data);
+      } catch {
+        // If status endpoint fails, continue anyway
+        setActiveCycleInfo(null);
+      }
 
       const listResponse = await api.appraisals.list();
       const base = listResponse.data ?? [];
@@ -100,6 +114,11 @@ function AppraisalsPage() {
     [appraisals],
   );
 
+  // Check if user has submitted for the current cycle (from actual appraisals list)
+  const hasSubmittedForCurrentCycle = useMemo(() => {
+    return appraisals.some((item) => item.status !== "DRAFT");
+  }, [appraisals]);
+
   return (
     <AppShell role={role}>
       <PageHeader
@@ -142,6 +161,57 @@ function AppraisalsPage() {
               Continue Self-Appraisal
               <ArrowRight className="h-4 w-4" />
             </Link>
+          </div>
+        </div>
+      ) : activeCycleInfo && !activeCycleInfo.hasRequest ? (
+        <div className="mb-6 rounded-2xl border-l-4 border-brand bg-brand-light p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium text-brand">
+                Active Appraisal Cycle Open
+              </p>
+              <p className="mt-1 text-sm text-text-2">
+                Submit your appraisal to get started with the current cycle.
+              </p>
+            </div>
+            <Link
+              href="/faculty-dashboard/request-appraisal"
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark"
+            >
+              Submit Appraisal
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      ) : !hasSubmittedForCurrentCycle && activeCycleInfo ? (
+        <div className="mb-6 rounded-2xl border-l-4 border-brand bg-brand-light p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium text-brand">
+                Active Appraisal Cycle Open
+              </p>
+              <p className="mt-1 text-sm text-text-2">
+                Submit your appraisal to get started with the current cycle.
+              </p>
+            </div>
+            <Link
+              href="/faculty-dashboard/request-appraisal"
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark"
+            >
+              Submit Appraisal
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      ) : hasSubmittedForCurrentCycle ? (
+        <div className="mb-6 rounded-2xl border-l-4 border-success bg-success-bg p-4 shadow-sm">
+          <div>
+            <p className="text-sm font-medium text-success">
+              ✓ Appraisal submitted for current cycle
+            </p>
+            <p className="mt-1 text-sm text-text-2">
+              Thank you for submitting. Please wait for the next cycle to open.
+            </p>
           </div>
         </div>
       ) : (
@@ -263,4 +333,4 @@ function AppraisalsPage() {
   );
 }
 
-export default withAuth(AppraisalsPage, ["EMPLOYEE"]);
+export default withAuth(AppraisalsPage, ["EMPLOYEE", "FACULTY"]);

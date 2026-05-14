@@ -166,7 +166,7 @@ function CommitteeDashboardPage() {
       ) : (
         <div className="space-y-6">
           {/* Filter Section */}
-          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          {/* <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
               <Filter className="h-4 w-4 text-text-2" />
               <p className="text-sm font-semibold text-text">
@@ -190,7 +190,7 @@ function CommitteeDashboardPage() {
                 ),
               )}
             </div>
-          </div>
+          </div> */}
 
           {/* Appraisals Grid */}
           <div className="grid gap-4">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
   ExternalLink,
   Loader2,
   SendHorizontal,
@@ -14,7 +15,8 @@ import { withAuth } from "@/components/auth/withAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ConfirmDialog } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, type AppraisalSummary } from "@/lib/api";
+import { API_ORIGIN } from "@/lib/api-client";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 import type {
@@ -22,6 +24,7 @@ import type {
   FacultyAppraisalRequestStatus,
   FacultyEvidenceUpload,
 } from "@svgoi/shared-types";
+import type { FacultyAppraisalDetail } from "@/lib/api";
 
 type CriterionState = {
   selectedValue: string;
@@ -35,6 +38,54 @@ type PendingUpload = {
   file: File;
 };
 
+function toDriveProxy(url: string) {
+  try {
+    const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    const q = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    const fileId = m?.[1] ?? q?.[1];
+    if (!fileId) return url;
+    return `${API_ORIGIN}/api/v1/drive/${fileId}`;
+  } catch {
+    return url;
+  }
+}
+
+function normalizeDriveUrl(value: string) {
+  if (
+    value.includes("drive.google.com/uc") ||
+    value.includes("lh3.googleusercontent.com")
+  ) {
+    const q = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (q && q[1]) {
+      return toDriveProxy(`https://drive.google.com/uc?export=view&id=${q[1]}`);
+    }
+    const normalized = value.replace("export=download", "export=view");
+    return toDriveProxy(normalized);
+  }
+
+  const m = value.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m && m[1]) {
+    return toDriveProxy(`https://drive.google.com/uc?export=view&id=${m[1]}`);
+  }
+  const q2 = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (q2 && q2[1]) {
+    return toDriveProxy(`https://drive.google.com/uc?export=view&id=${q2[1]}`);
+  }
+
+  return value;
+}
+
+function resolveEvidenceUrl(url: string) {
+  if (!url) return url;
+  if (url.startsWith("http")) {
+    return normalizeDriveUrl(url);
+  }
+  if (url.startsWith("/")) {
+    return `${API_ORIGIN}${url}`;
+  }
+  return url;
+}
+
 function FacultyAppraisalRequestPage() {
   const { session } = useAuthStore();
   const role = getPrimaryRole(session?.user.roles ?? []);
@@ -42,6 +93,11 @@ function FacultyAppraisalRequestPage() {
   const [status, setStatus] = useState<FacultyAppraisalRequestStatus | null>(
     null,
   );
+  const [submitted, setSubmitted] = useState<FacultyAppraisalDetail | null>(
+    null,
+  );
+  const [appraisals, setAppraisals] = useState<AppraisalSummary[]>([]);
+  const [appraisalsLoading, setAppraisalsLoading] = useState(false);
   const [criteriaState, setCriteriaState] = useState<
     Record<string, CriterionState>
   >({});
@@ -53,6 +109,7 @@ function FacultyAppraisalRequestPage() {
     null,
   );
   const [confirmUploadOpen, setConfirmUploadOpen] = useState(false);
+  const [expandedAppraisals, setExpandedAppraisals] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -74,6 +131,30 @@ function FacultyAppraisalRequestPage() {
         setPolicy(policyData);
         setStatus(statusResponse.data);
 
+        if (statusResponse.data.hasRequest && statusResponse.data.appraisalId) {
+          const detailsResponse = await api.faculty.getAppraisalDetails(
+            statusResponse.data.appraisalId,
+          );
+          if (active) {
+            setSubmitted(detailsResponse.data);
+          }
+        }
+
+        setAppraisalsLoading(true);
+        const listResponse = await api.appraisals.list();
+        if (active) {
+          const appraisalsData = listResponse.data ?? [];
+          setAppraisals(appraisalsData);
+
+          // Expand the first submitted appraisal by default
+          const firstSubmitted = appraisalsData.find(
+            (a) => a.status !== "DRAFT",
+          );
+          if (firstSubmitted && active) {
+            setExpandedAppraisals([firstSubmitted.id]);
+          }
+        }
+
         const initialState: Record<string, CriterionState> = {};
         policyData.criteria.forEach((criterion) => {
           initialState[criterion.key] = {
@@ -93,6 +174,9 @@ function FacultyAppraisalRequestPage() {
           );
         }
       } finally {
+        if (active) {
+          setAppraisalsLoading(false);
+        }
         if (active) {
           setLoading(false);
         }
@@ -121,6 +205,11 @@ function FacultyAppraisalRequestPage() {
       (criterion) => criteriaState[criterion.key]?.selectedValue,
     );
   }, [criteriaState, policy]);
+
+  const submittedAppraisals = useMemo(
+    () => appraisals.filter((appraisal) => appraisal.status !== "DRAFT"),
+    [appraisals],
+  );
 
   const incrementPercent = useMemo(() => {
     if (!policy) {
@@ -231,6 +320,12 @@ function FacultyAppraisalRequestPage() {
       await api.faculty.submitAppraisalRequest({ items });
       const statusResponse = await api.faculty.getAppraisalStatus();
       setStatus(statusResponse.data);
+      if (statusResponse.data.hasRequest && statusResponse.data.appraisalId) {
+        const detailsResponse = await api.faculty.getAppraisalDetails(
+          statusResponse.data.appraisalId,
+        );
+        setSubmitted(detailsResponse.data);
+      }
       setMessage("Appraisal request submitted successfully.");
     } catch (submitError: any) {
       setError(
@@ -253,6 +348,16 @@ function FacultyAppraisalRequestPage() {
     setPendingUpload(null);
     setConfirmUploadOpen(false);
     await uploadEvidence(upload.criterionKey, upload.file);
+  }
+
+  function toggleAppraisalExpanded(appraisalId: string) {
+    setExpandedAppraisals((prev) => {
+      if (prev.includes(appraisalId)) {
+        return prev.filter((id) => id !== appraisalId);
+      } else {
+        return [...prev, appraisalId];
+      }
+    });
   }
 
   if (loading) {
@@ -288,18 +393,213 @@ function FacultyAppraisalRequestPage() {
         }
       />
 
-      {status?.hasRequest ? (
-        <section className="rounded-2xl border border-success/20 bg-success-bg p-6 text-success">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5" />
-            <p className="text-sm font-medium">
-              You have already requested appraisal for this cycle.
+      {/* Submitted Appraisals Section - Display First */}
+      <section className="mb-8 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-text">
+            Submitted Appraisals
+          </h2>
+          <Link
+            href="/appraisals"
+            className="text-xs font-semibold text-brand hover:text-brand-dark"
+          >
+            View all
+          </Link>
+        </div>
+
+        {appraisalsLoading ? (
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <div className="flex items-center gap-3 text-text-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Loading appraisals...</span>
+            </div>
+          </div>
+        ) : submittedAppraisals.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <p className="text-sm text-text-2">
+              No appraisal submitted yet for the current active cycle. Submit
+              your appraisal below to get started.
             </p>
           </div>
-          <p className="mt-2 text-sm">
-            Status: {status.status} | Total points: {status.totalPoints ?? 0} |
-            Increment: {status.incrementPercent ?? 0}%
-          </p>
+        ) : (
+          <div className="space-y-3">
+            {submittedAppraisals.map((appraisal) => {
+              const isExpanded = expandedAppraisals.includes(appraisal.id);
+              const statusColor =
+                appraisal.status === "SUBMITTED"
+                  ? "text-orange-600"
+                  : appraisal.status === "HR_FINALIZED"
+                  ? "text-success"
+                  : "text-blue-600";
+
+              return (
+                <div
+                  key={appraisal.id}
+                  className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleAppraisalExpanded(appraisal.id)}
+                    className="w-full px-5 py-4 text-left transition hover:bg-surface-2 cursor-pointer active:bg-surface-2 flex items-center justify-between group"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-text">
+                          {appraisal.cycle?.name ?? "Appraisal"}
+                        </h3>
+                        <span className={`text-xs font-medium ${statusColor}`}>
+                          {appraisal.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-text-3">
+                        Submitted:{" "}
+                        {appraisal.submittedAt
+                          ? new Date(appraisal.submittedAt).toLocaleDateString()
+                          : "Not submitted"}
+                        {appraisal.finalScore !== null &&
+                          ` • Score: ${appraisal.finalScore}`}
+                        {appraisal.finalPercent !== null &&
+                          ` • Increment: ${appraisal.finalPercent}%`}
+                      </p>
+                    </div>
+                    <ChevronDown
+                      className={`h-5 w-5 text-text-3 transition-transform duration-300 group-hover:text-text-2 flex-shrink-0 ml-2 ${
+                        isExpanded ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isExpanded && appraisal.items && (
+                    <div className="border-t border-border px-5 py-4 bg-surface-2">
+                      <div className="space-y-3 mb-4">
+                        {appraisal.items.map((item, index) => (
+                          <div key={index} className="text-sm">
+                            <p className="font-medium text-text">
+                              {item.label || `Item ${index + 1}`}
+                            </p>
+                            <p className="mt-1 text-text-2">
+                              Points: {item.selfScore ?? 0} / {item.weight}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <Link
+                        href={`/faculty-dashboard/appraisals/${appraisal.id}/view`}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-text-inv transition hover:bg-brand-dark"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View Full Details
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {status?.hasRequest ? (
+        <section className="space-y-4">
+          <div className="rounded-2xl border border-success/20 bg-success-bg p-6 text-success">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5" />
+              <p className="text-sm font-medium">
+                You have already requested appraisal for this cycle.
+              </p>
+            </div>
+            <p className="mt-2 text-sm">
+              Status: {status.status} | Total points: {status.totalPoints ?? 0}{" "}
+              | Increment: {status.incrementPercent ?? 0}%
+            </p>
+          </div>
+
+          {submitted ? (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                  Submitted Form
+                </p>
+                <p className="mt-1 text-sm text-text-2">
+                  Submitted on {submitted.submittedAt ?? "-"} | Final score:{" "}
+                  {submitted.finalScore ?? "-"} | Final percent:{" "}
+                  {submitted.finalPercent ?? "-"}%
+                </p>
+              </div>
+
+              {submitted.items.map((item) => (
+                <section
+                  key={item.id}
+                  className="rounded-2xl border border-border bg-surface p-5 shadow-sm"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <h3 className="font-display text-lg font-semibold text-text">
+                        {item.heading}
+                      </h3>
+                      <p className="mt-2 text-sm text-text-2">
+                        Selected: {item.selectedLabel || item.selectedValue}
+                      </p>
+                      <p className="mt-1 text-sm text-text-3">
+                        Points: {item.facultyPoints}
+                      </p>
+                      {item.evidence.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {item.evidence.map((evidence, index) => {
+                            const url =
+                              evidence.viewUrl ||
+                              evidence.url ||
+                              evidence.directUrl;
+                            if (!url) return null;
+                            return (
+                              <a
+                                key={`${item.id}-evidence-${index}`}
+                                href={resolveEvidenceUrl(url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-brand hover:text-brand-dark"
+                              >
+                                {evidence.fileName || "Evidence"}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                  Next Appraisal Cycle
+                </p>
+                <p className="mt-2 text-sm text-text-2">
+                  You have already submitted for the{" "}
+                  <strong>{status.status?.replace(/_/g, " ")}</strong> in the
+                  current cycle.
+                </p>
+                <p className="mt-1 text-xs text-text-3">
+                  The next appraisal cycle (e.g., 2026-2027) will be available
+                  soon. HR will notify you when it opens.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled
+              title="This button will be enabled when the next appraisal cycle opens by HR"
+              className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-5 text-sm font-medium text-text-2 opacity-60 cursor-not-allowed"
+            >
+              <Loader2 className="h-4 w-4" />
+              Waiting for Next Cycle...
+            </button>
+          </div>
         </section>
       ) : (
         <>

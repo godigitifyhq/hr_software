@@ -79,6 +79,31 @@ export interface AppraisalSummary {
   items?: AppraisalItemSummary[];
 }
 
+export interface FacultyAppraisalItemDetail {
+  id: string;
+  criterionKey: string;
+  heading: string;
+  selectedValue: string;
+  selectedLabel: string;
+  facultyPoints: number;
+  evidence: Array<{
+    fileName?: string;
+    url?: string;
+    viewUrl?: string | null;
+    directUrl?: string | null;
+    driveId?: string | null;
+  }>;
+}
+
+export interface FacultyAppraisalDetail {
+  id: string;
+  status: AppraisalStatus;
+  submittedAt?: string | null;
+  items: FacultyAppraisalItemDetail[];
+  finalScore?: number | null;
+  finalPercent?: number | null;
+}
+
 export interface AuditLogEntry {
   id: string;
   action: string;
@@ -271,6 +296,7 @@ export const api = {
           remark?: string;
         }>;
         overallRemark?: string;
+        finalize?: boolean;
       },
     ) =>
       unwrap<AppraisalSummary>(
@@ -280,6 +306,8 @@ export const api = {
   hr: {
     getTeamAppraisals: () =>
       unwrap<AppraisalSummary[]>(apiClient.get("/hr/review-list")),
+    getApprovedAppraisals: () =>
+      unwrap<AppraisalSummary[]>(apiClient.get("/hr/approved-list")),
     getById: (id: string) =>
       unwrap<AppraisalSummary>(apiClient.get(`/hr/requests/${id}`)),
     submitReview: (
@@ -383,6 +411,41 @@ export const api = {
     submitAppraisalRequest: (payload: FacultyAppraisalRequestPayload) =>
       unwrap<Record<string, unknown>>(
         apiClient.post("/faculty/appraisal/request", payload),
+      ),
+    getAppraisalDetails: (appraisalId: string) =>
+      unwrap<FacultyAppraisalDetail>(
+        apiClient.get(`/faculty/appraisal/${appraisalId}`),
+      ),
+  },
+  superAdmin: {
+    getAppraisals: (params?: {
+      cycleId?: string;
+      departmentId?: string;
+      status?: string;
+    }) => {
+      const query = new URLSearchParams();
+      if (params?.cycleId) query.append("cycleId", params.cycleId);
+      if (params?.departmentId)
+        query.append("departmentId", params.departmentId);
+      if (params?.status) query.append("status", params.status);
+      const queryString = query.toString();
+      return unwrap<AppraisalSummary[]>(
+        apiClient.get(
+          `/admin/appraisals${queryString ? `?${queryString}` : ""}`,
+        ),
+      );
+    },
+    getById: (id: string) =>
+      unwrap<AppraisalSummary>(apiClient.get(`/admin/appraisals/${id}`)),
+    approve: (
+      id: string,
+      data: {
+        adjustedPercent?: number;
+        remark?: string;
+      },
+    ) =>
+      unwrap<Record<string, unknown>>(
+        apiClient.post(`/admin/appraisals/${id}/approve`, data),
       ),
   },
 };

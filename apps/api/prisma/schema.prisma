@@ -23,6 +23,8 @@ enum AppraisalStatus {
   HOD_REVIEW
   COMMITTEE_REVIEW
   HR_FINALIZED
+  SUPER_ADMIN_PENDING
+  FULLY_APPROVED
   CLOSED
 }
 
@@ -170,6 +172,8 @@ model Appraisal {
   finalPercent   Float?
   hodRemarks     String?
   committeeNotes String?
+  superAdminApprovedPercent Float?
+  superAdminRemark String?
   items          AppraisalItem[]
   committeeAssignments CommitteeAssignment[]
   createdAt      DateTime @default(now())

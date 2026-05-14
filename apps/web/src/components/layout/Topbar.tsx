@@ -60,21 +60,21 @@ export function Topbar() {
         <div className="min-w-0 flex-1 text-sm text-text-2">
           <span className="truncate">{breadcrumbs}</span>
         </div>
-
+{/* 
         <button
           type="button"
           className="hidden h-9 w-[240px] items-center gap-2 rounded-full border border-transparent bg-surface-2 px-4 text-sm text-text-3 transition hover:border-border hover:bg-surface-3 md:flex"
         >
           <Search className="h-4 w-4" />
           <span>Search...</span>
-        </button>
+        </button> */}
 
-        <button
+        {/* <button
           type="button"
           className="rounded-full p-2 text-text-2 transition hover:bg-surface-2 hover:text-text"
         >
           <Bell className="h-4 w-4" />
-        </button>
+        </button> */}
 
         <div className="relative">
           <button

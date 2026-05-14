@@ -407,4 +407,4 @@ function AppraisalEditPage() {
   );
 }
 
-export default withAuth(AppraisalEditPage, ["EMPLOYEE"]);
+export default withAuth(AppraisalEditPage, ["EMPLOYEE", "FACULTY"]);

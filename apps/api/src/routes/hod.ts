@@ -637,6 +637,7 @@ const committeeReviewSchema = z.object({
     )
     .min(1),
   overallRemark: z.string().optional(),
+  finalize: z.boolean().optional(),
 });
 
 router.get(
@@ -799,7 +800,9 @@ router.put(
         return;
       }
 
-      if (parsed.items.length !== appraisal.items.length) {
+      const isFinalSubmit = parsed.finalize ?? false;
+
+      if (isFinalSubmit && parsed.items.length !== appraisal.items.length) {
         res.status(400).json({
           success: false,
           message: "Please review all criteria items before submitting",
@@ -886,37 +889,45 @@ router.put(
           });
         }
 
-        await transaction.appraisal.update({
-          where: { id: appraisalId },
-          data: {
-            status: "HR_FINALIZED",
-            finalScore: totalApproved,
-            committeeNotes: JSON.stringify({
-              overallRemark: parsed.overallRemark?.trim() || null,
-              reviewedBy: committeeId,
-              reviewedAt: new Date().toISOString(),
-            }),
-          },
-        });
+        if (isFinalSubmit) {
+          await transaction.appraisal.update({
+            where: { id: appraisalId },
+            data: {
+              status: "HR_FINALIZED",
+              finalScore: totalApproved,
+              committeeNotes: JSON.stringify({
+                overallRemark: parsed.overallRemark?.trim() || null,
+                reviewedBy: committeeId,
+                reviewedAt: new Date().toISOString(),
+              }),
+            },
+          });
+        }
       });
 
       await writeAuditLog({
         actorId: committeeId,
-        action: "appraisal.committee.review.completed",
+        action: isFinalSubmit
+          ? "appraisal.committee.review.completed"
+          : "appraisal.committee.review.saved",
         resource: "Appraisal",
         resourceId: appraisalId,
         meta: {
           totalApproved,
+          finalize: isFinalSubmit,
+          savedItems: parsed.items.length,
         },
       });
 
       res.json({
         success: true,
-        message: "Appraisal reviewed successfully",
+        message: isFinalSubmit
+          ? "Appraisal reviewed successfully"
+          : "Committee section saved successfully",
         data: {
           appraisalId,
           totalApprovedPoints: totalApproved,
-          forwardedStatus: "HR_FINALIZED",
+          forwardedStatus: isFinalSubmit ? "HR_FINALIZED" : "COMMITTEE_REVIEW",
         },
       });
     } catch (error) {
