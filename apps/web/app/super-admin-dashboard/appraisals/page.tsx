@@ -29,15 +29,15 @@ function SuperAdminAppraislalsPage() {
   const [appraisals, setAppraisals] = useState<AppraisalWithSalary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("SUPER_ADMIN_PENDING");
+  const [statusFilter, setStatusFilter] = useState<string>(
+    "SUPER_ADMIN_PENDING",
+  );
   const [departmentFilter, setDepartmentFilter] = useState<string>("");
   const [cycleFilter, setCycleFilter] = useState<string>("");
   const [departments, setDepartments] = useState<
     Array<{ id: string; name: string }>
   >([]);
-  const [cycles, setCycles] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
+  const [cycles, setCycles] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     if (!session) {
@@ -68,7 +68,7 @@ function SuperAdminAppraislalsPage() {
       setError(
         err?.response?.data?.message ||
           err?.message ||
-          "Failed to load appraisals"
+          "Failed to load appraisals",
       );
     } finally {
       setLoading(false);
@@ -82,15 +82,17 @@ function SuperAdminAppraislalsPage() {
         api.appraisals.list(),
       ]);
 
-      const uniqueDepts = deptsRes.data ? Array.from(new Set(
-        deptsRes.data.map((d: any) => d.name)
-      )) : [];
-      const uniqueCycles = cyclesRes.data ? Array.from(new Set(
-        cyclesRes.data.map((a: any) => a.cycle?.name)
-      )).filter(Boolean) : [];
+      const uniqueDepts = deptsRes.data
+        ? Array.from(new Set(deptsRes.data.map((d: any) => d.name)))
+        : [];
+      const uniqueCycles = cyclesRes.data
+        ? Array.from(
+            new Set(cyclesRes.data.map((a: any) => a.cycle?.name)),
+          ).filter(Boolean)
+        : [];
 
       setDepartments(
-        deptsRes.data?.map((d: any) => ({ id: d.id, name: d.name })) ?? []
+        deptsRes.data?.map((d: any) => ({ id: d.id, name: d.name })) ?? [],
       );
       setCycles(
         cyclesRes.data
@@ -100,7 +102,7 @@ function SuperAdminAppraislalsPage() {
             const existing = acc.find((x: any) => x.id === c.id);
             if (!existing) acc.push(c);
             return acc;
-          }, []) ?? []
+          }, []) ?? [],
       );
     } catch (err) {
       console.error("Failed to load filters:", err);
@@ -109,12 +111,12 @@ function SuperAdminAppraislalsPage() {
 
   const pendingCount = useMemo(
     () => appraisals.filter((a) => a.status === "SUPER_ADMIN_PENDING").length,
-    [appraisals]
+    [appraisals],
   );
 
   const approvedCount = useMemo(
     () => appraisals.filter((a) => a.status === "FULLY_APPROVED").length,
-    [appraisals]
+    [appraisals],
   );
 
   const totalSalaryImpact = useMemo(() => {
@@ -150,7 +152,9 @@ function SuperAdminAppraislalsPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
             Fully Approved
           </p>
-          <p className="mt-2 text-2xl font-bold text-success">{approvedCount}</p>
+          <p className="mt-2 text-2xl font-bold text-success">
+            {approvedCount}
+          </p>
           <p className="text-xs text-text-3">
             {approvedCount} appraisal{approvedCount !== 1 ? "s" : ""}
           </p>
@@ -163,9 +167,7 @@ function SuperAdminAppraislalsPage() {
           <p className="mt-2 text-2xl font-bold text-brand">
             ₹{Math.round(totalSalaryImpact).toLocaleString()}
           </p>
-          <p className="text-xs text-text-3">
-            Total increment amount
-          </p>
+          <p className="text-xs text-text-3">Total increment amount</p>
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
@@ -175,9 +177,7 @@ function SuperAdminAppraislalsPage() {
           <p className="mt-2 text-2xl font-bold text-text">
             {appraisals.length}
           </p>
-          <p className="text-xs text-text-3">
-            In this view
-          </p>
+          <p className="text-xs text-text-3">In this view</p>
         </div>
       </div>
 
@@ -185,7 +185,10 @@ function SuperAdminAppraislalsPage() {
       <div className="mb-6 rounded-2xl border border-border bg-surface p-4">
         <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <label htmlFor="status-filter" className="block text-xs font-semibold uppercase tracking-widest text-text-3">
+            <label
+              htmlFor="status-filter"
+              className="block text-xs font-semibold uppercase tracking-widest text-text-3"
+            >
               Status
             </label>
             <select
@@ -204,7 +207,10 @@ function SuperAdminAppraislalsPage() {
           </div>
 
           <div>
-            <label htmlFor="dept-filter" className="block text-xs font-semibold uppercase tracking-widest text-text-3">
+            <label
+              htmlFor="dept-filter"
+              className="block text-xs font-semibold uppercase tracking-widest text-text-3"
+            >
               Department
             </label>
             <select
@@ -226,7 +232,10 @@ function SuperAdminAppraislalsPage() {
           </div>
 
           <div>
-            <label htmlFor="cycle-filter" className="block text-xs font-semibold uppercase tracking-widest text-text-3">
+            <label
+              htmlFor="cycle-filter"
+              className="block text-xs font-semibold uppercase tracking-widest text-text-3"
+            >
               Appraisal Cycle
             </label>
             <select
@@ -285,8 +294,7 @@ function SuperAdminAppraislalsPage() {
                       {/* Faculty Info */}
                       <div>
                         <h3 className="font-semibold text-text">
-                          {appraisal.user?.firstName}{" "}
-                          {appraisal.user?.lastName}
+                          {appraisal.user?.firstName} {appraisal.user?.lastName}
                         </h3>
                         <p className="text-xs text-text-3">
                           {appraisal.user?.email}
@@ -329,7 +337,7 @@ function SuperAdminAppraislalsPage() {
                                 {Math.round(
                                   (appraisal.currentSalary *
                                     (appraisal.finalPercent ?? 0)) /
-                                    100
+                                    100,
                                 ).toLocaleString()}
                               </p>
                             </div>

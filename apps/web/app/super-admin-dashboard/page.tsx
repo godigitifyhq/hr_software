@@ -196,11 +196,9 @@ export default function SuperAdminDashboard() {
                 Appraisals Pending
               </p>
               <p className="mt-2 text-2xl font-bold text-warning">
-                {
-                  stats?.appraisalsByStatus?.find(
-                    (s) => s.status === "SUPER_ADMIN_PENDING"
-                  )?._count ?? 0
-                }
+                {stats?.appraisalsByStatus?.find(
+                  (s) => s.status === "SUPER_ADMIN_PENDING",
+                )?._count ?? 0}
               </p>
               <p className="mt-1 text-xs text-text-2">
                 Awaiting super admin approval
@@ -220,15 +218,11 @@ export default function SuperAdminDashboard() {
                 Fully Approved
               </p>
               <p className="mt-2 text-2xl font-bold text-success">
-                {
-                  stats?.appraisalsByStatus?.find(
-                    (s) => s.status === "FULLY_APPROVED"
-                  )?._count ?? 0
-                }
+                {stats?.appraisalsByStatus?.find(
+                  (s) => s.status === "FULLY_APPROVED",
+                )?._count ?? 0}
               </p>
-              <p className="mt-1 text-xs text-text-2">
-                Appraisals completed
-              </p>
+              <p className="mt-1 text-xs text-text-2">Appraisals completed</p>
             </div>
             <CheckCircle2 className="h-8 w-8 text-success opacity-50 group-hover:opacity-100" />
           </div>
@@ -244,7 +238,9 @@ export default function SuperAdminDashboard() {
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
                 Total Users
               </p>
-              <p className="mt-2 text-2xl font-bold text-text">{stats.totalUsers}</p>
+              <p className="mt-2 text-2xl font-bold text-text">
+                {stats.totalUsers}
+              </p>
             </div>
 
             {/* Total Appraisals */}
@@ -252,7 +248,9 @@ export default function SuperAdminDashboard() {
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
                 Total Appraisals
               </p>
-              <p className="mt-2 text-2xl font-bold text-text">{stats.totalAppraisals}</p>
+              <p className="mt-2 text-2xl font-bold text-text">
+                {stats.totalAppraisals}
+              </p>
             </div>
 
             {/* HR Finalized */}
@@ -261,7 +259,9 @@ export default function SuperAdminDashboard() {
                 HR Finalized
               </p>
               <p className="mt-2 text-2xl font-bold text-warning">
-                {stats.appraisalsByStatus.find((s) => s.status === "HR_FINALIZED")?._count || 0}
+                {stats.appraisalsByStatus.find(
+                  (s) => s.status === "HR_FINALIZED",
+                )?._count || 0}
               </p>
             </div>
 
@@ -271,8 +271,11 @@ export default function SuperAdminDashboard() {
                 In Progress
               </p>
               <p className="mt-2 text-2xl font-bold text-text">
-                {(stats.appraisalsByStatus.find((s) => s.status === "SUBMITTED")?._count || 0) +
-                  (stats.appraisalsByStatus.find((s) => s.status === "HOD_REVIEW")?._count || 0)}
+                {(stats.appraisalsByStatus.find((s) => s.status === "SUBMITTED")
+                  ?._count || 0) +
+                  (stats.appraisalsByStatus.find(
+                    (s) => s.status === "HOD_REVIEW",
+                  )?._count || 0)}
               </p>
             </div>
           </div>
@@ -343,13 +346,19 @@ export default function SuperAdminDashboard() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-sm text-text-3">
+                  <td
+                    colSpan={4}
+                    className="px-6 py-8 text-center text-sm text-text-3"
+                  >
                     No users found
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="border-t border-border hover:bg-bg/50">
+                  <tr
+                    key={user.id}
+                    className="border-t border-border hover:bg-bg/50"
+                  >
                     <td className="px-6 py-4">
                       <p className="font-medium text-text">
                         {user.firstName} {user.lastName}
@@ -383,7 +392,9 @@ export default function SuperAdminDashboard() {
 
       {/* Recent Audit Logs */}
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-text">Recent Activity</h2>
+        <h2 className="mb-4 text-lg font-semibold text-text">
+          Recent Activity
+        </h2>
         <div className="space-y-3">
           {logs.length === 0 ? (
             <div className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-text-3 shadow-sm">
