@@ -30,8 +30,8 @@ export function middleware(request: NextRequest) {
     "content-security-policy",
     [
       "default-src 'self'",
-      `script-src 'self' 'nonce-${nonce}'`,
-      `style-src 'self' 'nonce-${nonce}'`,
+      `script-src 'self' 'unsafe-inline' 'nonce-${nonce}'`,
+      `style-src 'self' 'unsafe-inline' 'nonce-${nonce}'`,
       `img-src ${imgSrc}`,
       "frame-src https://drive.google.com",
       `connect-src ${connectSrc}`,
