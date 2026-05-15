@@ -17,15 +17,20 @@ function getApiOrigin() {
 }
 
 const apiOrigin = getApiOrigin();
+const productionApiOrigin = "https://hr-software-api.vercel.app";
+const allowedApiOrigins =
+  apiOrigin === productionApiOrigin
+    ? apiOrigin
+    : `${apiOrigin} ${productionApiOrigin}`;
 const connectSrc =
   process.env.NODE_ENV !== "production"
-    ? `'self' https://www.googleapis.com ${apiOrigin} ws: wss:`
-    : `'self' https://www.googleapis.com ${apiOrigin} https://drive.usercontent.google.com/ https://lh3.googleusercontent.com`;
+    ? `'self' https://www.googleapis.com ${allowedApiOrigins} ws: wss:`
+    : `'self' https://www.googleapis.com ${allowedApiOrigins} https://drive.usercontent.google.com/ https://lh3.googleusercontent.com`;
 
 const imgSrc =
   process.env.NODE_ENV !== "production"
-    ? "'self' data: http://localhost:4000 https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com"
-    : "'self' data: https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
+    ? `'self' data: http://localhost:4000 ${productionApiOrigin} https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com`
+    : `'self' data: ${allowedApiOrigins} https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com`;
 
 export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
