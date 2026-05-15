@@ -1,11 +1,8 @@
 /** @type {import('next').NextConfig} */
-const isDev = process.env.NODE_ENV !== "production";
-const scriptSrc = isDev ? "'self' 'unsafe-eval' 'unsafe-inline'" : "'self'";
-const styleSrc = isDev ? "'self' 'unsafe-inline'" : "'self'";
-const connectSrc = isDev
+const connectSrc = process.env.NODE_ENV !== "production"
   ? "'self' https://www.googleapis.com http://localhost:4000 ws: wss:"
   : "'self' https://www.googleapis.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
-const imgSrc = isDev
+const imgSrc = process.env.NODE_ENV !== "production"
   ? "'self' data: http://localhost:4000 https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com"
   : "'self' data: https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
 
@@ -20,10 +17,6 @@ const nextConfig = {
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "X-Frame-Options", value: "DENY" },
         { key: "X-XSS-Protection", value: "1; mode=block" },
-        {
-          key: "Content-Security-Policy",
-          value: `default-src 'self'; script-src ${scriptSrc}; style-src ${styleSrc}; img-src ${imgSrc}; frame-src https://drive.google.com; connect-src ${connectSrc}; object-src 'none'; base-uri 'self';`,
-        },
         { key: "Referrer-Policy", value: "no-referrer" },
       ],
     },
