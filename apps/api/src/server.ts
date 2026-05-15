@@ -98,6 +98,11 @@ app.use(
 );
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
-app.listen(port, () => console.log(`API server listening on port ${port}`));
+
+// When running on serverless platforms like Vercel, avoid calling `listen`.
+// Vercel will import this module and expect an exported request handler.
+if (!process.env.VERCEL) {
+  app.listen(port, () => console.log(`API server listening on port ${port}`));
+}
 
 export default app;
