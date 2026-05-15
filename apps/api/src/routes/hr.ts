@@ -218,11 +218,18 @@ router.get(
         const parsed = parseItemNotes(item.notes);
         const hodReview =
           typeof parsed.hodReview === "object"
-            ? (parsed.hodReview as Record<string, any>)
+            ? (parsed.hodReview as {
+                originalPoints?: number;
+                approvedPoints?: number;
+                remark?: string;
+              })
             : null;
         const committeeReview =
           typeof parsed.committeeReview === "object"
-            ? (parsed.committeeReview as Record<string, any>)
+            ? (parsed.committeeReview as {
+                approvedPoints?: number;
+                remark?: string;
+              })
             : null;
 
         return {
@@ -347,7 +354,10 @@ router.put(
         let upper = existing.points;
         if (existing.notes) {
           try {
-            const parsedNotes = JSON.parse(existing.notes);
+            const parsedNotes = JSON.parse(existing.notes) as {
+              committeeReview?: { approvedPoints?: number };
+              hodReview?: { approvedPoints?: number };
+            };
             if (
               typeof parsedNotes.committeeReview?.approvedPoints === "number"
             ) {

@@ -323,7 +323,11 @@ router.get(
         const parsed = parseItemNotes(item.notes);
         const hodReview =
           typeof parsed.hodReview === "object" && parsed.hodReview
-            ? (parsed.hodReview as Record<string, unknown>)
+            ? (parsed.hodReview as {
+                originalPoints?: number;
+                approvedPoints?: number;
+                remark?: string;
+              })
             : null;
 
         return {
