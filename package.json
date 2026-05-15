@@ -14,7 +14,8 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "format": "prettier --write .",
-    "bootstrap": "pnpm install"
+    "bootstrap": "pnpm install",
+    "postinstall": "pnpm --filter @svgoi/api prisma:generate"
   },
   "devDependencies": {
     "turbo": "^1.9.0",
