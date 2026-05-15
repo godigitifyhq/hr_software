@@ -10,28 +10,21 @@ const imgSrc =
     ? "'self' data: http://localhost:4000 https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com"
     : "'self' data: https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
 
-function generateNonce() {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary);
-}
-
 export function middleware(request: NextRequest) {
-  const nonce = generateNonce();
   const requestHeaders = new Headers(request.headers);
 
+  // Previous CSP included both 'unsafe-inline' and a nonce for script/style.
+  // In CSP, once a nonce is present, 'unsafe-inline' is ignored for that directive.
+  // Next.js app-router emits framework inline runtime/hydration scripts that must be
+  // explicitly nonce-tagged; without full nonce propagation, those scripts are blocked.
+  // Temporary production-safe debug posture: remove nonce usage entirely so hydration
+  // can run. A strict nonce CSP requires end-to-end nonce wiring for all inline scripts.
   requestHeaders.set(
     "content-security-policy",
     [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline' 'nonce-${nonce}'`,
-      `style-src 'self' 'unsafe-inline' 'nonce-${nonce}'`,
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
       `img-src ${imgSrc}`,
       "frame-src https://drive.google.com",
       `connect-src ${connectSrc}`,
@@ -39,8 +32,6 @@ export function middleware(request: NextRequest) {
       "base-uri 'self'",
     ].join("; "),
   );
-
-  requestHeaders.set("x-nonce", nonce);
 
   const response = NextResponse.next({
     request: {
@@ -52,7 +43,6 @@ export function middleware(request: NextRequest) {
     "Content-Security-Policy",
     requestHeaders.get("content-security-policy") ?? "",
   );
-  response.headers.set("x-nonce", nonce);
 
   return response;
 }
