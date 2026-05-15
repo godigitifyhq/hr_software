@@ -1,10 +1,12 @@
 /** @type {import('next').NextConfig} */
-const connectSrc = process.env.NODE_ENV !== "production"
-  ? "'self' https://www.googleapis.com http://localhost:4000 ws: wss:"
-  : "'self' https://www.googleapis.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
-const imgSrc = process.env.NODE_ENV !== "production"
-  ? "'self' data: http://localhost:4000 https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com"
-  : "'self' data: https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
+const connectSrc =
+  process.env.NODE_ENV !== "production"
+    ? "'self' https://www.googleapis.com http://localhost:4000 ws: wss:"
+    : "'self' https://www.googleapis.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
+const imgSrc =
+  process.env.NODE_ENV !== "production"
+    ? "'self' data: http://localhost:4000 https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com"
+    : "'self' data: https://drive.google.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
 
 const nextConfig = {
   reactStrictMode: true,
