@@ -1,9 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 
+function getApiOrigin() {
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://hr-software-api.vercel.app/api/v1"
+      : "http://localhost:4000/api/v1");
+
+  try {
+    return new URL(apiUrl).origin;
+  } catch {
+    return process.env.NODE_ENV === "production"
+      ? "https://hr-software-api.vercel.app"
+      : "http://localhost:4000";
+  }
+}
+
+const apiOrigin = getApiOrigin();
 const connectSrc =
   process.env.NODE_ENV !== "production"
-    ? "'self' https://www.googleapis.com http://localhost:4000 ws: wss:"
-    : "'self' https://www.googleapis.com https://drive.usercontent.google.com/ https://lh3.googleusercontent.com";
+    ? `'self' https://www.googleapis.com ${apiOrigin} ws: wss:`
+    : `'self' https://www.googleapis.com ${apiOrigin} https://drive.usercontent.google.com/ https://lh3.googleusercontent.com`;
 
 const imgSrc =
   process.env.NODE_ENV !== "production"
@@ -19,6 +36,7 @@ export function middleware(request: NextRequest) {
   // explicitly nonce-tagged; without full nonce propagation, those scripts are blocked.
   // Temporary production-safe debug posture: remove nonce usage entirely so hydration
   // can run. A strict nonce CSP requires end-to-end nonce wiring for all inline scripts.
+  // Keep the API origin in connect-src so production login/fetch requests are allowed.
   requestHeaders.set(
     "content-security-policy",
     [
