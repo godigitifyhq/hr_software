@@ -60,6 +60,23 @@ function HodDashboardPage() {
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [cycleIdFilter, setCycleIdFilter] = useState("");
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
+  const [cycles, setCycles] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [deptsRes, cyclesRes] = await Promise.all([
+          api.departments.list(),
+          api.appraisals.getCycles(),
+        ]);
+        setDepartments(deptsRes.data ?? []);
+        setCycles(cyclesRes.data ?? []);
+      } catch {
+        // non-critical
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -103,20 +120,6 @@ function HodDashboardPage() {
       active = false;
     };
   }, [cycleFilter]);
-
-  const departments = useMemo(() => {
-    const seen = new Set<string>();
-    return requests
-      .filter((r) => r.user?.department?.id && !seen.has(r.user.department.id) && seen.add(r.user.department.id))
-      .map((r) => r.user.department as { id: string; name: string });
-  }, [requests]);
-
-  const cycles = useMemo(() => {
-    const seen = new Set<string>();
-    return requests
-      .filter((r) => r.cycle?.id && !seen.has(r.cycle.id) && seen.add(r.cycle.id))
-      .map((r) => r.cycle);
-  }, [requests]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

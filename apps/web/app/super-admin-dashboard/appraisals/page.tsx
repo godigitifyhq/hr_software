@@ -78,31 +78,10 @@ function SuperAdminAppraislalsPage() {
     try {
       const [deptsRes, cyclesRes] = await Promise.all([
         api.departments.list(),
-        api.appraisals.list(),
+        api.appraisals.getCycles(),
       ]);
-
-      const uniqueDepts = deptsRes.data
-        ? Array.from(new Set(deptsRes.data.map((d: any) => d.name)))
-        : [];
-      const uniqueCycles = cyclesRes.data
-        ? Array.from(
-            new Set(cyclesRes.data.map((a: any) => a.cycle?.name)),
-          ).filter(Boolean)
-        : [];
-
-      setDepartments(
-        deptsRes.data?.map((d: any) => ({ id: d.id, name: d.name })) ?? [],
-      );
-      setCycles(
-        cyclesRes.data
-          ?.map((a: any) => a.cycle)
-          .filter((c: any) => c)
-          .reduce((acc: any, c: any) => {
-            const existing = acc.find((x: any) => x.id === c.id);
-            if (!existing) acc.push(c);
-            return acc;
-          }, []) ?? [],
-      );
+      setDepartments(deptsRes.data?.map((d: any) => ({ id: d.id, name: d.name })) ?? []);
+      setCycles(cyclesRes.data?.map((c: any) => ({ id: c.id, name: c.name })) ?? []);
     } catch (err) {
       console.error("Failed to load filters:", err);
     }

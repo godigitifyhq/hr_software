@@ -229,6 +229,22 @@ router.get(
 );
 
 router.get(
+  "/cycles",
+  authenticateRequest,
+  async (_req: AuthenticatedRequest, res, next) => {
+    try {
+      const cycles = await prisma.appraisalCycle.findMany({
+        select: { id: true, name: true, startDate: true, endDate: true, isActive: true },
+        orderBy: { startDate: "desc" },
+      });
+      res.json({ success: true, message: "Cycles", data: cycles });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+router.get(
   "/committee/review-list",
   authenticateRequest,
   requireRoles("COMMITTEE", "HR", "SUPER_ADMIN"),

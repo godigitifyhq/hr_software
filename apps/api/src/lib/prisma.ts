@@ -13,6 +13,9 @@ function getDbUrl(): string | undefined {
     if (!parsed.searchParams.has('pool_timeout')) {
       parsed.searchParams.set('pool_timeout', '10');
     }
+    if (!parsed.searchParams.has('pgbouncer')) {
+      parsed.searchParams.set('pgbouncer', 'true');
+    }
     return parsed.toString();
   } catch {
     return url;

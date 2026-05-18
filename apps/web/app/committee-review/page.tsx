@@ -56,6 +56,23 @@ function CommitteeDashboardPage() {
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [cycleFilter, setCycleFilter] = useState("");
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
+  const [cycles, setCycles] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [deptsRes, cyclesRes] = await Promise.all([
+          api.departments.list(),
+          api.appraisals.getCycles(),
+        ]);
+        setDepartments(deptsRes.data ?? []);
+        setCycles(cyclesRes.data ?? []);
+      } catch {
+        // non-critical
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -88,20 +105,6 @@ function CommitteeDashboardPage() {
     void loadAppraisals();
     return () => { active = false; };
   }, [cycleToggle]);
-
-  const departments = useMemo(() => {
-    const seen = new Set<string>();
-    return appraisals
-      .filter((a) => a.user?.department?.id && !seen.has(a.user.department.id) && seen.add(a.user.department.id))
-      .map((a) => a.user.department as { id: string; name: string });
-  }, [appraisals]);
-
-  const cycles = useMemo(() => {
-    const seen = new Set<string>();
-    return appraisals
-      .filter((a) => a.cycle?.id && !seen.has(a.cycle.id) && seen.add(a.cycle.id))
-      .map((a) => a.cycle);
-  }, [appraisals]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

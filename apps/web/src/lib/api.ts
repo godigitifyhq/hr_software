@@ -380,6 +380,10 @@ export const api = {
   },
   appraisals: {
     list: () => unwrap<AppraisalSummary[]>(apiClient.get("/appraisals")),
+    getCycles: () =>
+      unwrap<Array<{ id: string; name: string; startDate: string; endDate: string; isActive: boolean }>>(
+        apiClient.get("/appraisals/cycles"),
+      ),
     getById: (id: string) =>
       unwrap<AppraisalSummary>(apiClient.get(`/appraisals/${id}`)),
     update: (
