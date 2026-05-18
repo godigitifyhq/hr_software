@@ -67,8 +67,8 @@ export async function authenticateRequest(req: AuthenticatedRequest, res: Respon
                 return res.status(401).json({ success: false, message: 'User not found' });
             }
 
-            userState = { lockedUntil: user.lockedUntil, deletedAt: user.deletedAt };
-            setCachedUserState(claims.sub, userState);
+            setCachedUserState(claims.sub, { lockedUntil: user.lockedUntil, deletedAt: user.deletedAt });
+            userState = getCachedUserState(claims.sub)!;
         }
 
         if (userState.deletedAt) {
