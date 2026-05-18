@@ -17,10 +17,11 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api } from "@/lib/api";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
+import type { AppraisalStatus } from "@svgoi/shared-types";
 
 type HodRequestSummary = {
   id: string;
-  status: string;
+  status: AppraisalStatus;
   submittedAt?: string | null;
   finalScore?: number | null;
   user: {
