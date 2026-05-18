@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, Users } from "lucide-react";
+import { ArrowRight, Loader2, Users } from "lucide-react";
 import { withAuth } from "@/components/auth/withAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -103,14 +103,20 @@ function HrDashboardPage() {
                 {requests.length}
               </p>
             </div>
-            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <Link
+              href="/hr-dashboard/appraisals"
+              className="rounded-2xl border border-border bg-surface p-4 shadow-sm transition hover:border-brand/40 hover:shadow-md block"
+            >
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
                 Pending Review
               </p>
-              <p className="mt-2 font-display text-3xl font-bold text-text">
-                {pendingCount}
-              </p>
-            </div>
+              <div className="mt-2 flex items-end justify-between">
+                <p className="font-display text-3xl font-bold text-text">{pendingCount}</p>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand">
+                  View <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </div>
+            </Link>
             <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
                 Finalized
@@ -122,11 +128,19 @@ function HrDashboardPage() {
           </div>
 
           <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Users className="h-5 w-5 text-brand" />
-              <h2 className="font-display text-xl font-semibold text-text">
-                Appraisals for HR
-              </h2>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-brand" />
+                <h2 className="font-display text-xl font-semibold text-text">
+                  Appraisals for HR
+                </h2>
+              </div>
+              <Link
+                href="/hr-dashboard/appraisals"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-dark"
+              >
+                View All <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
 
             {requests.length === 0 ? (
@@ -135,7 +149,7 @@ function HrDashboardPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {requests.map((request) => (
+                {requests.slice(0, 5).map((request) => (
                   <article
                     key={request.id}
                     className="rounded-xl border border-border bg-bg p-4"
@@ -155,7 +169,7 @@ function HrDashboardPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="rounded-full bg-brand-light px-3 py-1 text-xs font-semibold text-brand">
-                          {request.status}
+                          {request.status.replace(/_/g, " ")}
                         </span>
                         <Link
                           href={`/hr-review/${request.id}/review`}
@@ -167,6 +181,14 @@ function HrDashboardPage() {
                     </div>
                   </article>
                 ))}
+                {requests.length > 5 && (
+                  <Link
+                    href="/hr-dashboard/appraisals"
+                    className="block rounded-xl border border-dashed border-border p-3 text-center text-sm font-medium text-text-2 transition hover:border-brand/40 hover:text-brand"
+                  >
+                    +{requests.length - 5} more — View All Appraisals
+                  </Link>
+                )}
               </div>
             )}
           </section>

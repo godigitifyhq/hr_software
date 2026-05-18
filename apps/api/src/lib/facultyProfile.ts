@@ -119,7 +119,6 @@ export function isFacultyProfileComplete(user: UserProfileRecord): boolean {
       profile?.dateOfJoining &&
       user.departmentId &&
       typeof profile?.currentSalary === "number" &&
-      profile?.lastIncrementDate &&
       typeof profile?.tenthMarks === "number" &&
       typeof profile?.twelfthMarks === "number" &&
       typeof profile?.totalExperience === "number" &&

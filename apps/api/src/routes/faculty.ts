@@ -601,50 +601,47 @@ router.put(
       const postGraduation = parsed.postGraduation?.trim() || null;
       const phdDegree = parsed.phdDegree?.trim() || null;
 
-      await prisma.$transaction([
-        prisma.user.update({
-          where: { id: userId },
-          data: {
-            departmentId: parsed.departmentId,
-          },
-        }),
-        prisma.facultyProfile.upsert({
+      const isHod = req.auth?.roles?.includes("HOD") ?? false;
+      const lastIncrementDate = parsed.lastIncrementDate
+        ? new Date(parsed.lastIncrementDate)
+        : null;
+
+      const profileData = {
+        fatherName: parsed.fatherName.trim(),
+        dob: new Date(parsed.dob),
+        dateOfJoining: new Date(parsed.dateOfJoining),
+        currentSalary: parsed.currentSalary,
+        lastIncrementDate,
+        panEncrypted: encryptedIdentity.panEncrypted,
+        aadharEncrypted: encryptedIdentity.aadharEncrypted,
+        tenthMarks: parsed.tenthMarks,
+        twelfthMarks: parsed.twelfthMarks,
+        qualification,
+        graduation,
+        postGraduation,
+        phdDegree,
+        totalExperience: parsed.totalExperience,
+      };
+
+      if (isHod) {
+        await prisma.facultyProfile.upsert({
           where: { userId },
-          update: {
-            fatherName: parsed.fatherName.trim(),
-            dob: new Date(parsed.dob),
-            dateOfJoining: new Date(parsed.dateOfJoining),
-            currentSalary: parsed.currentSalary,
-            lastIncrementDate: new Date(parsed.lastIncrementDate),
-            panEncrypted: encryptedIdentity.panEncrypted,
-            aadharEncrypted: encryptedIdentity.aadharEncrypted,
-            tenthMarks: parsed.tenthMarks,
-            twelfthMarks: parsed.twelfthMarks,
-            qualification,
-            graduation,
-            postGraduation,
-            phdDegree,
-            totalExperience: parsed.totalExperience,
-          },
-          create: {
-            userId,
-            fatherName: parsed.fatherName.trim(),
-            dob: new Date(parsed.dob),
-            dateOfJoining: new Date(parsed.dateOfJoining),
-            currentSalary: parsed.currentSalary,
-            lastIncrementDate: new Date(parsed.lastIncrementDate),
-            panEncrypted: encryptedIdentity.panEncrypted,
-            aadharEncrypted: encryptedIdentity.aadharEncrypted,
-            tenthMarks: parsed.tenthMarks,
-            twelfthMarks: parsed.twelfthMarks,
-            qualification,
-            graduation,
-            postGraduation,
-            phdDegree,
-            totalExperience: parsed.totalExperience,
-          },
-        }),
-      ]);
+          update: profileData,
+          create: { userId, ...profileData },
+        });
+      } else {
+        await prisma.$transaction([
+          prisma.user.update({
+            where: { id: userId },
+            data: { departmentId: parsed.departmentId },
+          }),
+          prisma.facultyProfile.upsert({
+            where: { userId },
+            update: profileData,
+            create: { userId, ...profileData },
+          }),
+        ]);
+      }
 
       const user = await getProfileUser(userId);
       if (!user) {
@@ -762,24 +759,10 @@ router.get(
         return;
       }
 
-      const today = new Date();
-
-      // Fetch profile and active cycle in parallel — both independent
-      const [profile, cycle] = await Promise.all([
-        prisma.facultyProfile.findUnique({
-          where: { userId },
-          select: { dateOfJoining: true },
-        }),
-        prisma.appraisalCycle.findFirst({
-          where: { isActive: true },
-          orderBy: { startDate: "desc" },
-        }),
-      ]);
-
-      const windowResult = checkAppraisalWindow(
-        profile?.dateOfJoining ?? null,
-        today,
-      );
+      const cycle = await prisma.appraisalCycle.findFirst({
+        where: { isActive: true },
+        orderBy: { startDate: "desc" },
+      });
 
       if (!cycle) {
         res.json({
@@ -788,9 +771,9 @@ router.get(
           data: {
             hasRequest: false,
             cycleActive: false,
-            inWindow: windowResult.inWindow,
-            windowOpen: windowResult.windowOpen,
-            windowClose: windowResult.windowClose,
+            inWindow: true,
+            windowOpen: null,
+            windowClose: null,
           },
         });
         return;
@@ -815,12 +798,23 @@ router.get(
             hasRequest: false,
             cycleActive: true,
             cycle: { name: cycle.name, endDate: cycle.endDate.toISOString() },
-            inWindow: windowResult.inWindow,
-            windowOpen: windowResult.windowOpen,
-            windowClose: windowResult.windowClose,
+            inWindow: true,
+            windowOpen: null,
+            windowClose: null,
           },
         });
         return;
+      }
+
+      // HOD's own appraisal should never sit at HOD_REVIEW — auto-advance to COMMITTEE_REVIEW.
+      const isHodCaller = (req.auth?.roles ?? []).includes("HOD");
+      let effectiveStatus = appraisal.status;
+      if (isHodCaller && appraisal.status === "HOD_REVIEW") {
+        await prisma.appraisal.update({
+          where: { id: appraisal.id },
+          data: { status: "COMMITTEE_REVIEW" },
+        });
+        effectiveStatus = "COMMITTEE_REVIEW";
       }
 
       res.json({
@@ -829,15 +823,15 @@ router.get(
         data: {
           hasRequest: true,
           appraisalId: appraisal.id,
-          status: appraisal.status,
+          status: effectiveStatus,
           submittedAt: appraisal.submittedAt?.toISOString() ?? null,
           totalPoints: appraisal.finalScore ?? null,
           incrementPercent: appraisal.finalPercent ?? null,
           cycleActive: true,
           cycle: { name: cycle.name, endDate: cycle.endDate.toISOString() },
-          inWindow: windowResult.inWindow,
-          windowOpen: windowResult.windowOpen,
-          windowClose: windowResult.windowClose,
+          inWindow: true,
+          windowOpen: null,
+          windowClose: null,
         },
       });
     } catch (error) {
@@ -1183,27 +1177,6 @@ router.post(
         return;
       }
 
-      // Enforce join-date window
-      const windowResult = checkAppraisalWindow(
-        user.facultyProfile?.dateOfJoining ?? null,
-        new Date(),
-      );
-      if (!windowResult.inWindow) {
-        const openDate = windowResult.windowOpen
-          ? new Date(windowResult.windowOpen).toLocaleDateString("en-IN", { month: "long", day: "numeric" })
-          : "the next window";
-        res.status(403).json({
-          success: false,
-          message: `Appraisal form is not open yet. Your window opens on ${openDate}.`,
-          data: {
-            inWindow: false,
-            windowOpen: windowResult.windowOpen,
-            windowClose: windowResult.windowClose,
-          },
-        });
-        return;
-      }
-
       if (!isFacultyProfileComplete(user)) {
         res.status(400).json({
           success: false,
@@ -1318,6 +1291,11 @@ router.post(
           })
         ).id;
 
+      // HOD submitting their own appraisal skips HOD review and goes directly to committee.
+      const submissionStatus = (req.auth?.roles ?? []).includes("HOD")
+        ? "COMMITTEE_REVIEW"
+        : "HOD_REVIEW";
+
       await prisma.$transaction(async (transaction) => {
         await transaction.appraisalItem.deleteMany({
           where: { appraisalId },
@@ -1336,10 +1314,12 @@ router.post(
         await transaction.appraisal.update({
           where: { id: appraisalId },
           data: {
-            // Send submitted requests to HOD for review first
-            status: "HOD_REVIEW",
+            status: submissionStatus,
             submittedAt: new Date(),
-            // finalScore/finalPercent and locked are set later by HR
+            // Store self-assessed score so the submitter can see it on the view page.
+            // HR review will overwrite these with the final approved values.
+            finalScore: totalPoints,
+            finalPercent: incrementPercent,
           },
         });
       });
@@ -1351,7 +1331,7 @@ router.post(
           appraisalId,
           totalPoints,
           incrementPercent,
-          status: "HOD_REVIEW",
+          status: submissionStatus,
         },
       });
     } catch (error) {

@@ -88,8 +88,25 @@ router.get(
   requireRoles("HR", "SUPER_ADMIN"),
   async (req: AuthenticatedRequest, res, next) => {
     try {
+      const cycleIdParam =
+        typeof req.query.cycleId === "string" ? req.query.cycleId : null;
+
+      let effectiveCycleId: string | null = null;
+      if (cycleIdParam && cycleIdParam !== "all") {
+        effectiveCycleId = cycleIdParam;
+      } else if (!cycleIdParam) {
+        const activeCycle = await prisma.appraisalCycle.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        effectiveCycleId = activeCycle?.id ?? null;
+      }
+
       const appraisals = await prisma.appraisal.findMany({
-        where: { status: { in: ["HR_FINALIZED", "FULLY_APPROVED"] } },
+        where: {
+          ...(effectiveCycleId ? { cycleId: effectiveCycleId } : {}),
+          status: { in: ["HR_FINALIZED", "FULLY_APPROVED"] },
+        },
         include: {
           cycle: {
             select: { id: true, name: true, startDate: true, endDate: true },
@@ -947,6 +964,13 @@ const createCycleSchema = z.object({
   isActive: z.boolean().optional().default(false),
 });
 
+const updateCycleSchema = z.object({
+  name: z.string().min(1).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
 router.post(
   "/cycles",
   authenticateRequest,
@@ -960,7 +984,7 @@ router.post(
           name: input.name,
           startDate: new Date(input.startDate),
           endDate: new Date(input.endDate),
-          isActive: input.isActive ?? false,
+          isActive: input.isActive,
         },
         select: { id: true, name: true, startDate: true, endDate: true, isActive: true },
       });
@@ -970,7 +994,7 @@ router.post(
         action: "hr.cycle.created",
         resource: "AppraisalCycle",
         resourceId: cycle.id,
-        meta: { name: cycle.name },
+        meta: { name: cycle.name, isActive: cycle.isActive },
       });
 
       res.status(201).json({ success: true, message: "Cycle created", data: cycle });
@@ -979,13 +1003,6 @@ router.post(
     }
   },
 );
-
-const updateCycleSchema = z.object({
-  name: z.string().min(1).optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  isActive: z.boolean().optional(),
-});
 
 router.put(
   "/cycles/:cycleId",

@@ -7,7 +7,7 @@ export const facultyProfileSchema = z.object({
   dob: z.string().min(1, "Date of birth is required"),
   dateOfJoining: z.string().min(1, "Date of joining is required"),
   currentSalary: numericValue.min(0, "Current salary is required"),
-  lastIncrementDate: z.string().min(1, "Last increment date is required"),
+  lastIncrementDate: z.string().optional().nullable(),
   pan: z.string().trim().optional().nullable(),
   aadhar: z.string().trim().optional().nullable(),
   tenthMarks: numericValue.min(0, "10th marks are required"),
@@ -34,7 +34,7 @@ export const facultyAppraisalRequestSchema = z.object({
       z.object({
         criterionKey: z.string().min(1),
         selectedValue: z.string().min(1),
-        evidence: facultyAppraisalEvidenceSchema.optional().nullable(),
+        evidence: z.array(facultyAppraisalEvidenceSchema).optional().nullable(),
       }),
     )
     .min(1),

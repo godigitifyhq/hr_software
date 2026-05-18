@@ -11,6 +11,7 @@ import {
   Loader2,
   SendHorizontal,
   Upload,
+  X,
   XCircle,
 } from "lucide-react";
 import { withAuth } from "@/components/auth/withAuth";
@@ -31,12 +32,12 @@ type CriterionState = {
   selectedValue: string;
   points: number;
   uploading: boolean;
-  evidence: FacultyEvidenceUpload | null;
+  evidence: FacultyEvidenceUpload[] | null;
 };
 
 type PendingUpload = {
   criterionKey: string;
-  file: File;
+  files: File[];
 };
 
 function toDriveProxy(url: string) {
@@ -105,19 +106,39 @@ function cycleStatusLabel(entry: FacultyCycleSummary): {
   if (!entry.appraisal) {
     return entry.cycle.isActive
       ? { label: "Pending", color: "text-blue-700", bgColor: "bg-blue-50" }
-      : { label: "Not Submitted", color: "text-gray-500", bgColor: "bg-gray-100" };
+      : {
+          label: "Not Submitted",
+          color: "text-gray-500",
+          bgColor: "bg-gray-100",
+        };
   }
   const s = entry.appraisal.status;
   if (s === "DRAFT") {
-    return { label: "Draft", color: "text-orange-700", bgColor: "bg-orange-50" };
+    return {
+      label: "Draft",
+      color: "text-orange-700",
+      bgColor: "bg-orange-50",
+    };
   }
   if (s === "HOD_REVIEW" || s === "COMMITTEE_REVIEW") {
-    return { label: "Under Review", color: "text-yellow-700", bgColor: "bg-yellow-50" };
+    return {
+      label: "Under Review",
+      color: "text-yellow-700",
+      bgColor: "bg-yellow-50",
+    };
   }
   if (s === "HR_FINALIZED" || s === "FULLY_APPROVED" || s === "CLOSED") {
-    return { label: "Finalized", color: "text-green-700", bgColor: "bg-green-50" };
+    return {
+      label: "Finalized",
+      color: "text-green-700",
+      bgColor: "bg-green-50",
+    };
   }
-  return { label: s.replace(/_/g, " "), color: "text-text-2", bgColor: "bg-surface" };
+  return {
+    label: s.replace(/_/g, " "),
+    color: "text-text-2",
+    bgColor: "bg-surface",
+  };
 }
 
 function FacultyAppraisalRequestPage() {
@@ -128,14 +149,19 @@ function FacultyAppraisalRequestPage() {
   const [cyclesLoading, setCyclesLoading] = useState(true);
   const [cyclesError, setCyclesError] = useState<string | null>(null);
 
-  const [selectedCycle, setSelectedCycle] = useState<FacultyCycleSummary | null>(null);
+  const [selectedCycle, setSelectedCycle] =
+    useState<FacultyCycleSummary | null>(null);
   const [policy, setPolicy] = useState<FacultyAppraisalPolicy | null>(null);
-  const [criteriaState, setCriteriaState] = useState<Record<string, CriterionState>>({});
+  const [criteriaState, setCriteriaState] = useState<
+    Record<string, CriterionState>
+  >({});
   const [formLoading, setFormLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(
+    null,
+  );
   const [confirmUploadOpen, setConfirmUploadOpen] = useState(false);
 
   useEffect(() => {
@@ -231,10 +257,17 @@ function FacultyAppraisalRequestPage() {
     return bracket?.incrementPercent ?? 0;
   }, [policy, totalPoints]);
 
-  function updateCriterionSelection(criterionKey: string, selectedValue: string) {
+  function updateCriterionSelection(
+    criterionKey: string,
+    selectedValue: string,
+  ) {
     if (!policy) return;
-    const criterion = policy.criteria.find((entry) => entry.key === criterionKey);
-    const option = criterion?.options.find((entry) => entry.value === selectedValue);
+    const criterion = policy.criteria.find(
+      (entry) => entry.key === criterionKey,
+    );
+    const option = criterion?.options.find(
+      (entry) => entry.value === selectedValue,
+    );
     setCriteriaState((current) => ({
       ...current,
       [criterionKey]: {
@@ -264,13 +297,17 @@ function FacultyAppraisalRequestPage() {
     }));
 
     try {
-      const response = await api.faculty.uploadAppraisalEvidence(criterionKey, file);
+      const response = await api.faculty.uploadAppraisalEvidence(
+        criterionKey,
+        file,
+      );
+
       setCriteriaState((current) => ({
         ...current,
         [criterionKey]: {
           ...current[criterionKey],
           uploading: false,
-          evidence: response.data,
+          evidence: [...(current[criterionKey]?.evidence ?? []), response.data],
         },
       }));
     } catch (uploadError: any) {
@@ -284,6 +321,16 @@ function FacultyAppraisalRequestPage() {
           "Failed to upload evidence",
       );
     }
+  }
+
+  function removeEvidence(criterionKey: string, idx: number) {
+    setCriteriaState((current) => ({
+      ...current,
+      [criterionKey]: {
+        ...current[criterionKey],
+        evidence: (current[criterionKey]?.evidence ?? []).filter((_, i) => i !== idx),
+      },
+    }));
   }
 
   async function submitRequest() {
@@ -325,13 +372,20 @@ function FacultyAppraisalRequestPage() {
     const upload = pendingUpload;
     setPendingUpload(null);
     setConfirmUploadOpen(false);
-    await uploadEvidence(upload.criterionKey, upload.file);
+    // upload files sequentially to preserve ordering and progress
+    for (const file of upload.files) {
+      // eslint-disable-next-line no-await-in-loop
+      await uploadEvidence(upload.criterionKey, file);
+    }
   }
 
   if (cyclesLoading) {
     return (
       <AppShell role={role}>
-        <PageHeader title="Appraisal Cycles" subtitle="Loading your appraisal history..." />
+        <PageHeader
+          title="Appraisal Cycles"
+          subtitle="Loading your appraisal history..."
+        />
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
           <div className="flex items-center gap-3 text-text-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -440,7 +494,10 @@ function FacultyAppraisalRequestPage() {
                           value={state?.selectedValue || ""}
                           aria-label={`${criterion.heading} criteria`}
                           onChange={(event) =>
-                            updateCriterionSelection(criterion.key, event.target.value)
+                            updateCriterionSelection(
+                              criterion.key,
+                              event.target.value,
+                            )
                           }
                           className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
                         >
@@ -459,15 +516,23 @@ function FacultyAppraisalRequestPage() {
                             ) : (
                               <Upload className="h-4 w-4" />
                             )}
-                            {state?.uploading ? "Uploading..." : "Upload evidence"}
+                            {state?.uploading
+                              ? "Uploading..."
+                              : "Upload evidence"}
                             <input
                               type="file"
                               accept="image/jpeg,image/png,application/pdf"
+                              multiple
                               className="hidden"
                               onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                if (file) {
-                                  setPendingUpload({ criterionKey: criterion.key, file });
+                                const files = Array.from(
+                                  event.target.files || [],
+                                );
+                                if (files.length > 0) {
+                                  setPendingUpload({
+                                    criterionKey: criterion.key,
+                                    files,
+                                  });
                                   setConfirmUploadOpen(true);
                                 }
                                 event.target.value = "";
@@ -477,29 +542,37 @@ function FacultyAppraisalRequestPage() {
                           <p className="mt-1 text-xs text-text-3">
                             JPG, PNG, or PDF. Max 5MB.
                           </p>
-                          {state?.evidence ? (
-                            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                              <p className="text-success">
-                                Uploaded: {state.evidence.fileName}
-                              </p>
-                              {(state.evidence.viewUrl ||
-                                state.evidence.url ||
-                                state.evidence.directUrl) && (
-                                <a
-                                  href={resolveEvidenceUrl(
-                                    state.evidence.viewUrl ||
-                                      state.evidence.url ||
-                                      state.evidence.directUrl ||
-                                      "",
-                                  )}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1 font-semibold text-brand hover:text-brand-dark"
+                          {state?.evidence && state.evidence.length > 0 ? (
+                            <div className="mt-2 flex flex-col gap-1.5 text-xs">
+                              {state.evidence.map((e, idx) => (
+                                <div
+                                  key={`${e.fileName}-${idx}`}
+                                  className="flex items-center gap-2"
                                 >
-                                  View file
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
+                                  <p className="truncate text-success">{e.fileName}</p>
+                                  {(e.viewUrl || e.url || e.directUrl) && (
+                                    <a
+                                      href={resolveEvidenceUrl(
+                                        e.viewUrl || e.url || e.directUrl || "",
+                                      )}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex shrink-0 items-center gap-1 font-semibold text-brand hover:text-brand-dark"
+                                    >
+                                      View
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    aria-label="Remove evidence"
+                                    onClick={() => removeEvidence(criterion.key, idx)}
+                                    className="ml-auto shrink-0 rounded p-0.5 text-text-3 transition hover:bg-danger-bg hover:text-danger"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           ) : null}
                         </div>
@@ -548,7 +621,9 @@ function FacultyAppraisalRequestPage() {
           title="Confirm evidence upload"
           description={
             pendingUpload
-              ? `Upload ${pendingUpload.file.name} for this criterion? This file will be shared with reviewers.`
+              ? pendingUpload.files.length > 1
+                ? `Upload ${pendingUpload.files.length} files for this criterion? These files will be shared with reviewers.`
+                : `Upload ${pendingUpload.files[0].name} for this criterion? This file will be shared with reviewers.`
               : "Upload this evidence file?"
           }
           confirmLabel="Upload file"
@@ -586,7 +661,8 @@ function FacultyAppraisalRequestPage() {
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-text-3" />
             <p className="text-sm text-text-2">
-              No appraisal cycles have been created yet. Please check back later.
+              No appraisal cycles have been created yet. Please check back
+              later.
             </p>
           </div>
         </div>
@@ -630,7 +706,9 @@ function FacultyAppraisalRequestPage() {
                       <p className="mt-1 text-sm text-text-2">
                         Status: {entry.appraisal.status.replace(/_/g, " ")}
                         {entry.appraisal.submittedAt &&
-                          ` • Submitted ${new Date(entry.appraisal.submittedAt).toLocaleDateString()}`}
+                          ` • Submitted ${new Date(
+                            entry.appraisal.submittedAt,
+                          ).toLocaleDateString()}`}
                         {entry.appraisal.finalScore != null &&
                           ` • Score: ${entry.appraisal.finalScore}`}
                         {entry.appraisal.finalPercent != null &&

@@ -376,8 +376,7 @@ function CommitteeReviewPage() {
     () =>
       (appraisal?.items ?? []).reduce(
         (sum, item) =>
-          sum +
-          (item.committeeApprovedPoints ?? item.hodApprovedPoints),
+          sum + (item.committeeApprovedPoints ?? item.hodApprovedPoints),
         0,
       ),
     [appraisal],
@@ -883,17 +882,21 @@ function CommitteeReviewPage() {
                     </div>
                   )}
 
-                  {item.evidence?.url ? (
-                    <div className="mt-4">
-                      <a
-                        href={fullEvidenceUrl(item.evidence.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 text-sm font-medium text-brand hover:text-brand-dark"
-                      >
-                        View uploaded evidence
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
+                  {Array.isArray(item.evidence) && item.evidence.length > 0 ? (
+                    <div className="mt-4 space-y-1">
+                      {(item.evidence as unknown as any[]).map((e: any, idx: number) => (
+                        <a
+                          key={idx}
+                          href={fullEvidenceUrl(e.url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-brand hover:text-brand-dark"
+                        >
+                          View uploaded evidence
+                          {(item.evidence as unknown as any[]).length > 1 ? ` (${idx + 1})` : ""}
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      ))}
                     </div>
                   ) : null}
                 </section>

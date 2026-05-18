@@ -187,7 +187,7 @@ export interface FacultyProfilePayload {
   dob: string;
   dateOfJoining: string;
   currentSalary: number;
-  lastIncrementDate: string;
+  lastIncrementDate?: string | null;
   tenthMarks: number;
   twelfthMarks: number;
   totalExperience: number;
@@ -240,7 +240,7 @@ export interface FacultyEvidenceUpload {
 export interface FacultyAppraisalRequestItemPayload {
   criterionKey: string;
   selectedValue: string;
-  evidence?: FacultyEvidenceUpload | null;
+  evidence?: FacultyEvidenceUpload[] | null;
 }
 
 export interface FacultyAppraisalRequestPayload {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clock, DollarSign, Loader2, Users } from "lucide-react";
+import { Clock, Loader2, Users } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { withAuth } from "@/components/auth/withAuth";
@@ -39,7 +39,10 @@ function HrSubmissionsPage() {
   const [approvedSubmissions, setApprovedSubmissions] = useState<
     HrSubmissionSummary[]
   >([]);
-  const [activeTab, setActiveTab] = useState<"review" | "approved">("review");
+  const isAdminRole = role === "ADMIN" || role === "SUPER_ADMIN";
+  const [activeTab, setActiveTab] = useState<"review" | "approved">(
+    isAdminRole ? "approved" : "review",
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,11 +54,15 @@ function HrSubmissionsPage() {
         setLoading(true);
         setError(null);
         const [reviewResponse, approvedResponse] = await Promise.all([
-          api.hr.getTeamAppraisals(),
+          api.hr.getTeamAppraisals("all"),
           api.hr.getApprovedAppraisals(),
         ]);
         if (!active) return;
-        setReviewSubmissions(reviewResponse.data ?? []);
+        setReviewSubmissions(
+          (reviewResponse.data ?? []).filter(
+            (a: any) => a.status === "HR_FINALIZED",
+          ),
+        );
         setApprovedSubmissions(approvedResponse.data ?? []);
       } catch (loadError: any) {
         if (active) {
@@ -117,15 +124,17 @@ function HrSubmissionsPage() {
             </div>
           ) : null}
 
-          <div className="mb-6 grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
-                Ready for HR Review
-              </p>
-              <p className="mt-2 text-3xl font-bold text-text">
-                {reviewSubmissions.length}
-              </p>
-            </div>
+          <div className={`mb-6 grid gap-4 ${isAdminRole ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+            {!isAdminRole && (
+              <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                  Ready for HR Review
+                </p>
+                <p className="mt-2 text-3xl font-bold text-text">
+                  {reviewSubmissions.length}
+                </p>
+              </div>
+            )}
             <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
                 Fully Approved
@@ -155,17 +164,19 @@ function HrSubmissionsPage() {
             </div>
 
             <div className="mb-6 flex flex-wrap gap-2 rounded-xl border border-border bg-bg p-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab("review")}
-                className={
-                  activeTab === "review"
-                    ? "rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-text shadow-sm"
-                    : "rounded-lg px-4 py-2 text-sm font-medium text-text-2"
-                }
-              >
-                Ready for HR Review
-              </button>
+              {!isAdminRole && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("review")}
+                  className={
+                    activeTab === "review"
+                      ? "rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-text shadow-sm"
+                      : "rounded-lg px-4 py-2 text-sm font-medium text-text-2"
+                  }
+                >
+                  Ready for HR Review
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setActiveTab("approved")}

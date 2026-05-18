@@ -14,7 +14,7 @@ import {
   Loader2,
   CheckCircle2,
   Clock,
-  DollarSign,
+
   TrendingUp,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";

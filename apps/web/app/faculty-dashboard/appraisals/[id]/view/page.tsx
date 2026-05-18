@@ -185,7 +185,7 @@ function ViewSubmittedAppraisalPage() {
     <AppShell role={role}>
       <div className="mb-6 flex items-center gap-2">
         <Link
-          href="/faculty-dashboard"
+          href={role === "HOD" ? "/hod-review" : "/faculty-dashboard"}
           className="inline-flex items-center gap-2 text-sm font-medium text-brand hover:text-brand-dark"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -227,18 +227,22 @@ function ViewSubmittedAppraisalPage() {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
-                Final Score
+                {["HR_FINALIZED", "SUPER_ADMIN_PENDING", "FULLY_APPROVED"].includes(appraisal.status)
+                  ? "Final Score"
+                  : "Your Score"}
               </p>
               <p className="mt-2 text-sm font-medium text-text">
-                {appraisal.finalScore ?? "-"}
+                {appraisal.finalScore != null ? appraisal.finalScore : "-"}
               </p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
-                Final Percent
+                {["HR_FINALIZED", "SUPER_ADMIN_PENDING", "FULLY_APPROVED"].includes(appraisal.status)
+                  ? "Final Increment %"
+                  : "Expected Increment %"}
               </p>
               <p className="mt-2 text-sm font-medium text-text">
-                {appraisal.finalPercent ?? "-"}%
+                {appraisal.finalPercent != null ? `${appraisal.finalPercent}%` : "-"}
               </p>
             </div>
           </div>
@@ -293,4 +297,4 @@ function ViewSubmittedAppraisalPage() {
   );
 }
 
-export default withAuth(ViewSubmittedAppraisalPage, ["FACULTY", "EMPLOYEE"]);
+export default withAuth(ViewSubmittedAppraisalPage, ["FACULTY", "EMPLOYEE", "HOD"]);

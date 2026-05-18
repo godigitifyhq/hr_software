@@ -27,7 +27,7 @@ function getStatusBadge(status: string) {
   );
 }
 
-function HRReviewListPage() {
+function HrAppraisalsPage() {
   const { session } = useAuthStore();
   const role = getPrimaryRole(session?.user.roles ?? []);
 
@@ -69,7 +69,7 @@ function HRReviewListPage() {
   const departments = useMemo(() => {
     const seen = new Set<string>();
     return appraisals
-      .filter((a) => a.user?.department?.name && !seen.has(a.user.department.name) && seen.add(a.user.department.name))
+      .filter((a) => a.user?.department?.id && !seen.has(a.user.department.id) && seen.add(a.user.department.id))
       .map((a) => a.user.department as { id: string; name: string });
   }, [appraisals]);
 
@@ -100,12 +100,12 @@ function HRReviewListPage() {
     return (
       <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-sm text-text-2">{appraisal.user?.department?.name ?? "Department"}</div>
+          <div className="text-sm text-text-2">{appraisal.user?.department?.name ?? "—"}</div>
           <div className="mt-1 font-semibold text-text">
             {appraisal.user?.firstName} {appraisal.user?.lastName}
           </div>
           <div className="mt-0.5 text-xs text-text-3">{appraisal.user?.email}</div>
-          <div className="mt-1 text-xs text-text-3">Cycle: {appraisal.cycle?.name ?? "-"}</div>
+          <div className="mt-1 text-xs text-text-3">Cycle: {appraisal.cycle?.name ?? "—"}</div>
         </div>
         <div className="flex items-center gap-3">
           {getStatusBadge(appraisal.status)}
@@ -193,7 +193,7 @@ function HRReviewListPage() {
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
           <div className="flex items-center gap-3 text-text-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Loading HR review list...</span>
+            <span className="text-sm">Loading appraisals...</span>
           </div>
         </div>
       ) : (
@@ -229,10 +229,10 @@ function HRReviewListPage() {
               {approved.length > 0 && (
                 <section>
                   <div className="mb-4 flex items-center gap-2">
-                    <h2 className="font-display text-lg font-semibold text-text">HR Review Submitted</h2>
+                    <h2 className="font-display text-lg font-semibold text-text">Fully Approved</h2>
                     <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-text-3">{approved.length}</span>
                   </div>
-                  <p className="mb-4 text-sm text-text-2">These appraisals have been reviewed by HR and are read-only.</p>
+                  <p className="mb-4 text-sm text-text-2">These appraisals have been fully approved and are read-only.</p>
                   <div className="grid gap-4">
                     {approved.map((a) => <AppraisalRow key={a.id} appraisal={a} viewOnly={true} />)}
                   </div>
@@ -246,4 +246,4 @@ function HRReviewListPage() {
   );
 }
 
-export default withAuth(HRReviewListPage, ["HR"]);
+export default withAuth(HrAppraisalsPage, ["HR", "ADMIN"]);

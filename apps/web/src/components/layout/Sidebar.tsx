@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   ClipboardList,
   FileText,
   Shield,
@@ -67,6 +68,7 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
     title: "HR",
     items: [
       { label: "Overview", href: "/hr-dashboard", icon: LayoutDashboard },
+      { label: "Appraisals", href: "/hr-dashboard/appraisals", icon: ClipboardCheck },
       { label: "Faculty", href: "/hr-dashboard/faculty", icon: Users },
       {
         label: "Departments",
@@ -86,6 +88,7 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
     title: "Admin",
     items: [
       { label: "Overview", href: "/hr-dashboard", icon: LayoutDashboard },
+      { label: "Appraisals", href: "/hr-dashboard/appraisals", icon: ClipboardCheck },
       { label: "Faculty", href: "/hr-dashboard/faculty", icon: Users },
       {
         label: "Departments",
@@ -131,12 +134,12 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
         href: "/hr-dashboard/submissions",
         icon: FileText,
       },
-      { label: "Audit Log", href: "/hr-dashboard/audit", icon: Shield },
-      {
-        label: "System Settings",
-        href: "/hr-dashboard/settings",
-        icon: Settings2,
-      },
+      // { label: "Audit Log", href: "/hr-dashboard/audit", icon: Shield },
+      // {
+      //   label: "System Settings",
+      //   href: "/hr-dashboard/settings",
+      //   icon: Settings2,
+      // },
     ],
   },
 };

@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, Save } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  Save,
+} from "lucide-react";
 import { withAuth } from "@/components/auth/withAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -182,18 +188,24 @@ function HodReviewDetailPage() {
 
     const itemsPayload = detail.items.map((item) => ({
       itemId: item.id,
-      approvedPoints: Number(itemState[item.id]?.approvedPoints ?? item.facultyPoints),
+      approvedPoints: Number(
+        itemState[item.id]?.approvedPoints ?? item.facultyPoints,
+      ),
       remark: itemState[item.id]?.remark?.trim() || undefined,
     }));
 
     const hasDeduction = detail.items.some((item) => {
-      const approved = Number(itemState[item.id]?.approvedPoints ?? item.facultyPoints);
+      const approved = Number(
+        itemState[item.id]?.approvedPoints ?? item.facultyPoints,
+      );
       return approved < item.facultyPoints;
     });
 
     if (hasDeduction) {
       const missingRemark = detail.items.some((item) => {
-        const approved = Number(itemState[item.id]?.approvedPoints ?? item.facultyPoints);
+        const approved = Number(
+          itemState[item.id]?.approvedPoints ?? item.facultyPoints,
+        );
         if (approved < item.facultyPoints) {
           return !(itemState[item.id]?.remark || "").trim();
         }
@@ -239,7 +251,10 @@ function HodReviewDetailPage() {
   if (loading) {
     return (
       <AppShell role={role}>
-        <PageHeader title="Review Request" subtitle="Loading request detail..." />
+        <PageHeader
+          title="Review Request"
+          subtitle="Loading request detail..."
+        />
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
           <div className="flex items-center gap-3 text-text-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -397,17 +412,21 @@ function HodReviewDetailPage() {
                 </div>
               )}
 
-              {item.evidence?.url ? (
-                <div className="mt-4">
-                  <a
-                    href={fullEvidenceUrl(item.evidence.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-brand hover:text-brand-dark"
-                  >
-                    View uploaded evidence
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+              {Array.isArray(item.evidence) && item.evidence.length > 0 ? (
+                <div className="mt-4 space-y-1">
+                  {(item.evidence as unknown as any[]).map((e: any, idx: number) => (
+                    <a
+                      key={idx}
+                      href={fullEvidenceUrl(e.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-brand hover:text-brand-dark"
+                    >
+                      View uploaded evidence
+                      {(item.evidence as unknown as any[]).length > 1 ? ` (${idx + 1})` : ""}
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  ))}
                 </div>
               ) : null}
             </section>

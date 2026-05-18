@@ -7,7 +7,9 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Eye,
+  FileText,
   Loader2,
+  Search,
   Users,
 } from "lucide-react";
 import { withAuth } from "@/components/auth/withAuth";
@@ -47,12 +49,17 @@ function HodDashboardPage() {
   const [requests, setRequests] = useState<HodRequestSummary[]>([]);
   const [selfStatus, setSelfStatus] = useState<{
     hasRequest?: boolean;
+    appraisalId?: string;
     status?: string;
     totalPoints?: number | null;
     incrementPercent?: number | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cycleFilter, setCycleFilter] = useState<"active" | "all">("active");
+  const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("");
+  const [cycleIdFilter, setCycleIdFilter] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -62,7 +69,7 @@ function HodDashboardPage() {
         setLoading(true);
         setError(null);
         const [requestResponse, selfResponse] = await Promise.all([
-          api.hod.getFacultyRequests(),
+          api.hod.getFacultyRequests(cycleFilter === "all" ? "all" : undefined),
           api.faculty.getAppraisalStatus(),
         ]);
 
@@ -72,6 +79,9 @@ function HodDashboardPage() {
 
         setRequests((requestResponse.data ?? []) as HodRequestSummary[]);
         setSelfStatus(selfResponse.data as any);
+        setDeptFilter("");
+        setCycleIdFilter("");
+        setSearch("");
       } catch (loadError: any) {
         if (active) {
           setError(
@@ -92,15 +102,42 @@ function HodDashboardPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [cycleFilter]);
+
+  const departments = useMemo(() => {
+    const seen = new Set<string>();
+    return requests
+      .filter((r) => r.user?.department?.id && !seen.has(r.user.department.id) && seen.add(r.user.department.id))
+      .map((r) => r.user.department as { id: string; name: string });
+  }, [requests]);
+
+  const cycles = useMemo(() => {
+    const seen = new Set<string>();
+    return requests
+      .filter((r) => r.cycle?.id && !seen.has(r.cycle.id) && seen.add(r.cycle.id))
+      .map((r) => r.cycle);
+  }, [requests]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return requests.filter((r) => {
+      if (deptFilter && r.user?.department?.id !== deptFilter) return false;
+      if (cycleIdFilter && r.cycle?.id !== cycleIdFilter) return false;
+      if (q) {
+        const name = `${r.user.firstName} ${r.user.lastName} ${r.user.email}`.toLowerCase();
+        if (!name.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [requests, search, deptFilter, cycleIdFilter]);
 
   const pending = useMemo(
-    () => requests.filter((r) => PENDING_STATUSES.includes(r.status)),
-    [requests],
+    () => filtered.filter((r) => PENDING_STATUSES.includes(r.status)),
+    [filtered],
   );
   const reviewed = useMemo(
-    () => requests.filter((r) => !PENDING_STATUSES.includes(r.status)),
-    [requests],
+    () => filtered.filter((r) => !PENDING_STATUSES.includes(r.status)),
+    [filtered],
   );
 
   function RequestCard({
@@ -155,9 +192,20 @@ function HodDashboardPage() {
         subtitle="Review faculty appraisal requests and manage your own appraisal request."
         actions={
           selfStatus?.hasRequest ? (
-            <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-success/20 bg-success-bg px-4 text-sm font-medium text-success">
-              <CheckCircle2 className="h-4 w-4" />
-              Self Appraisal Requested
+            <div className="flex items-center gap-2">
+              <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-success/20 bg-success-bg px-4 text-sm font-medium text-success">
+                <CheckCircle2 className="h-4 w-4" />
+                Self Appraisal Submitted
+              </div>
+              {selfStatus.appraisalId ? (
+                <Link
+                  href={`/faculty-dashboard/appraisals/${selfStatus.appraisalId}/view`}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  View
+                </Link>
+              ) : null}
             </div>
           ) : (
             <Link
@@ -186,6 +234,49 @@ function HodDashboardPage() {
             </div>
           ) : null}
 
+          {/* Cycle toggle + filters */}
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-2">Showing:</span>
+              <div className="flex rounded-lg border border-border bg-surface p-1 text-xs font-medium">
+                <button type="button" onClick={() => setCycleFilter("active")} className={`rounded-md px-3 py-1.5 transition ${cycleFilter === "active" ? "bg-brand text-white shadow-sm" : "text-text-2 hover:text-text"}`}>Active Cycle</button>
+                <button type="button" onClick={() => setCycleFilter("all")} className={`rounded-md px-3 py-1.5 transition ${cycleFilter === "all" ? "bg-brand text-white shadow-sm" : "text-text-2 hover:text-text"}`}>All Cycles</button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-3" />
+                  <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-border bg-bg pl-9 pr-3 text-sm text-text placeholder:text-text-3"
+                  />
+                </div>
+                <select
+                  aria-label="Filter by department"
+                  value={deptFilter}
+                  onChange={(e) => setDeptFilter(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-text"
+                >
+                  <option value="">All Departments</option>
+                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+                <select
+                  aria-label="Filter by cycle"
+                  value={cycleIdFilter}
+                  onChange={(e) => setCycleIdFilter(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-text"
+                >
+                  <option value="">All Cycles</option>
+                  {cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div className="mb-6 grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
@@ -207,11 +298,23 @@ function HodDashboardPage() {
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
                 Your Self Request
               </p>
-              <p className="mt-2 text-sm font-medium text-text">
-                {selfStatus?.hasRequest
-                  ? `${selfStatus.status} (${selfStatus.totalPoints ?? 0} pts)`
-                  : "Not submitted"}
-              </p>
+              {selfStatus?.hasRequest ? (
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-text">
+                    {selfStatus.status?.replace(/_/g, " ")} &middot; {selfStatus.totalPoints ?? 0} pts &middot; {selfStatus.incrementPercent ?? 0}%
+                  </p>
+                  {selfStatus.appraisalId ? (
+                    <Link
+                      href={`/faculty-dashboard/appraisals/${selfStatus.appraisalId}/view`}
+                      className="shrink-0 text-xs font-semibold text-brand hover:text-brand-dark"
+                    >
+                      View
+                    </Link>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm font-medium text-text">Not submitted</p>
+              )}
             </div>
           </div>
 

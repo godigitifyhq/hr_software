@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { AuthenticatedRequest } from "../middleware/rbac";
 import { authenticateRequest, requireRoles } from "../middleware/rbac";
 import { prisma } from "../lib/prisma";
@@ -213,25 +213,53 @@ router.post(
         },
       });
 
-      const saved = await upsertUploadedDocument({
-        ownerId: userId,
-        module: moduleName,
-        fieldKey,
-        name: displayName,
-        originalName,
-        mime: file.mimetype,
-        size: file.size,
-        drive: {
-          driveFileId: uploaded.driveFileId,
-          viewUrl: uploaded.viewUrl,
-          directUrl: uploaded.directUrl,
-          folderId: uploaded.folderId,
-          mimeType: file.mimetype,
-          fileName: originalName,
-        },
-        storageProvider: "google-drive",
-        metadataJson: metadata ?? undefined,
-      });
+      let saved: Awaited<ReturnType<typeof prisma.document.findUniqueOrThrow>>;
+      let responseCriterionKey: string | undefined;
+
+      if (moduleName === APPRAISAL_EVIDENCE_UPLOAD_MODULE) {
+        // Each evidence upload creates an independent document so multiple files
+        // per criterion are preserved and nothing is overwritten/deleted.
+        const uniqueFieldKey = `${fieldKey}-${Date.now()}`;
+        saved = await prisma.document.create({
+          data: {
+            ownerId: userId,
+            module: moduleName,
+            fieldKey: uniqueFieldKey,
+            name: displayName,
+            originalName,
+            mime: file.mimetype,
+            size: file.size,
+            driveId: uploaded.driveFileId,
+            viewUrl: uploaded.viewUrl,
+            directUrl: uploaded.directUrl,
+            folderId: uploaded.folderId ?? null,
+            storageProvider: "google-drive",
+            metadataJson: metadata ?? Prisma.DbNull,
+          },
+        });
+        // Return the original criterionKey so the client can map it back
+        responseCriterionKey = fieldKey;
+      } else {
+        saved = await upsertUploadedDocument({
+          ownerId: userId,
+          module: moduleName,
+          fieldKey,
+          name: displayName,
+          originalName,
+          mime: file.mimetype,
+          size: file.size,
+          drive: {
+            driveFileId: uploaded.driveFileId,
+            viewUrl: uploaded.viewUrl,
+            directUrl: uploaded.directUrl,
+            folderId: uploaded.folderId,
+            mimeType: file.mimetype,
+            fileName: originalName,
+          },
+          storageProvider: "google-drive",
+          metadataJson: metadata ?? undefined,
+        });
+      }
 
       if (moduleName === "faculty-profile" && fieldKey === "profilePicture") {
         await prisma.facultyProfile.upsert({
@@ -246,6 +274,7 @@ router.post(
         message: "File uploaded successfully",
         data: {
           ...buildUploadResponse(saved),
+          ...(responseCriterionKey !== undefined ? { criterionKey: responseCriterionKey } : {}),
           validation,
         },
       });

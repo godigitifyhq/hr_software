@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Loader2,
-  DollarSign,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
+import { Loader2, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
@@ -331,7 +325,6 @@ function SuperAdminAppraislalsPage() {
                         {/* Salary Impact */}
                         {appraisal.currentSalary && (
                           <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2">
-                            <DollarSign className="h-4 w-4 text-success" />
                             <div className="text-xs">
                               <p className="text-text-3">Salary Increment</p>
                               <p className="font-semibold text-success">

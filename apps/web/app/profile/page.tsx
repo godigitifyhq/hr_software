@@ -609,17 +609,26 @@ function FacultyProfileSection() {
                   <label className="mb-1.5 block text-sm font-medium text-text">
                     Department
                   </label>
-                  <select
-                    {...register("departmentId")}
-                    className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                  >
-                    <option value="">Select department</option>
-                    {departments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name}
-                      </option>
-                    ))}
-                  </select>
+                  {role === "HOD" ? (
+                    <>
+                      <input type="hidden" {...register("departmentId")} />
+                      <div className="flex h-10 w-full items-center rounded-lg border border-border bg-surface px-3 text-sm text-text-2">
+                        {profile?.department?.name ?? "Not set"}
+                      </div>
+                    </>
+                  ) : (
+                    <select
+                      {...register("departmentId")}
+                      className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                    >
+                      <option value="">Select department</option>
+                      {departments.map((department) => (
+                        <option key={department.id} value={department.id}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   {errors.departmentId ? (
                     <p className="mt-1 text-xs text-danger">
                       {errors.departmentId.message}

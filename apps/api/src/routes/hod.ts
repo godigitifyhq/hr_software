@@ -182,8 +182,23 @@ router.get(
         return;
       }
 
+      const cycleIdParam =
+        typeof req.query.cycleId === "string" ? req.query.cycleId : null;
+
+      let effectiveCycleId: string | null = null;
+      if (cycleIdParam && cycleIdParam !== "all") {
+        effectiveCycleId = cycleIdParam;
+      } else if (!cycleIdParam) {
+        const activeCycle = await prisma.appraisalCycle.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        effectiveCycleId = activeCycle?.id ?? null;
+      }
+
       const appraisals = await prisma.appraisal.findMany({
         where: {
+          ...(effectiveCycleId ? { cycleId: effectiveCycleId } : {}),
           status: { in: ["SUBMITTED", "HOD_REVIEW", "COMMITTEE_REVIEW", "HR_FINALIZED", "FULLY_APPROVED", "CLOSED"] },
           user: {
             departmentId: dept.id,
@@ -706,14 +721,29 @@ router.get(
         },
       });
 
+      const committeeCycleParam =
+        typeof req.query.cycleId === "string" ? req.query.cycleId : null;
+
+      let committeeCycleId: string | null = null;
+      if (committeeCycleParam && committeeCycleParam !== "all") {
+        committeeCycleId = committeeCycleParam;
+      } else if (!committeeCycleParam) {
+        const activeCycle = await prisma.appraisalCycle.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        committeeCycleId = activeCycle?.id ?? null;
+      }
+
       const appraisals = committees
         .flatMap((committee) =>
           committee.assignments.map((assignment) => assignment.appraisal),
         )
         .filter(
           (appraisal) =>
-            appraisal.status === "COMMITTEE_REVIEW" ||
-            appraisal.status === "HR_FINALIZED",
+            (appraisal.status === "COMMITTEE_REVIEW" ||
+              appraisal.status === "HR_FINALIZED") &&
+            (!committeeCycleId || appraisal.cycle.id === committeeCycleId),
         );
 
       const payload = appraisals.map((appraisal) => ({
@@ -758,21 +788,23 @@ router.put(
       const { appraisalId } = req.params;
       const parsed = committeeReviewSchema.parse(req.body ?? {});
 
-      // Check if committee member is assigned to this appraisal
-      const assignment = await prisma.committeeAssignment.findFirst({
-        where: {
-          appraisalId,
-          committee: {
-            members: {
-              some: { id: committeeId },
-            },
-          },
-        },
+      // Check if committee member is assigned to this appraisal.
+      // If no committee is assigned at all, any committee member may review.
+      const anyAssignment = await prisma.committeeAssignment.findFirst({
+        where: { appraisalId },
       });
 
-      if (!assignment) {
-        res.status(403).json({ success: false, message: "Access denied" });
-        return;
+      if (anyAssignment) {
+        const memberAssignment = await prisma.committeeAssignment.findFirst({
+          where: {
+            appraisalId,
+            committee: { members: { some: { id: committeeId } } },
+          },
+        });
+        if (!memberAssignment) {
+          res.status(403).json({ success: false, message: "Access denied" });
+          return;
+        }
       }
 
       const appraisal = await prisma.appraisal.findUnique({

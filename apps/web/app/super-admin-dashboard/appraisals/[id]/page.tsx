@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2, Save, ArrowLeft, DollarSign } from "lucide-react";
+import { Loader2, Save, ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";

@@ -412,8 +412,10 @@ export const api = {
       unwrap<Record<string, unknown>>(
         apiClient.post(`/hod/appraisals/${id}/score`, data),
       ),
-    getFacultyRequests: () =>
-      unwrap<Record<string, unknown>[]>(apiClient.get("/hod/requests")),
+    getFacultyRequests: (cycleId?: string) =>
+      unwrap<Record<string, unknown>[]>(
+        apiClient.get(`/hod/requests${cycleId ? `?cycleId=${encodeURIComponent(cycleId)}` : ""}`),
+      ),
     getFacultyRequestById: (id: string) =>
       unwrap<Record<string, unknown>>(apiClient.get(`/hod/requests/${id}`)),
     submitFacultyReview: (
@@ -434,9 +436,9 @@ export const api = {
       ),
   },
   committee: {
-    getTeamAppraisals: () =>
+    getTeamAppraisals: (cycleId?: string) =>
       unwrap<AppraisalSummary[]>(
-        apiClient.get("/appraisals/committee/review-list"),
+        apiClient.get(`/appraisals/committee/review-list${cycleId ? `?cycleId=${encodeURIComponent(cycleId)}` : ""}`),
       ),
     submitReview: (
       id: string,
@@ -455,8 +457,10 @@ export const api = {
       ),
   },
   hr: {
-    getTeamAppraisals: () =>
-      unwrap<HrAppraisalSummary[]>(apiClient.get("/hr/review-list")),
+    getTeamAppraisals: (cycleId?: string) =>
+      unwrap<HrAppraisalSummary[]>(
+        apiClient.get(`/hr/review-list${cycleId ? `?cycleId=${encodeURIComponent(cycleId)}` : ""}`),
+      ),
     getApprovedAppraisals: () =>
       unwrap<HrAppraisalSummary[]>(apiClient.get("/hr/approved-list")),
     getById: (id: string) =>

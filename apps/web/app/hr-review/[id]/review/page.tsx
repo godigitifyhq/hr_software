@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2, Save } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Save } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   AppraisalReviewLayer,
@@ -116,6 +116,41 @@ function HRReviewDetail() {
   );
 
   const canEdit = appraisal?.status === "HR_FINALIZED";
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    faculty: true,
+    hod: true,
+    committee: true,
+    hr: true,
+  });
+
+  function toggleSection(key: string) {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function AccordionSection({ sectionKey, title, description, children }: {
+    sectionKey: string;
+    title: string;
+    description: string;
+    children: React.ReactNode;
+  }) {
+    const isOpen = openSections[sectionKey] ?? true;
+    return (
+      <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+        <button
+          type="button"
+          onClick={() => toggleSection(sectionKey)}
+          className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-surface-2"
+        >
+          <div>
+            <h3 className="font-display text-base font-semibold text-text">{title}</h3>
+            <p className="mt-0.5 text-xs text-text-2">{description}</p>
+          </div>
+          {isOpen ? <ChevronUp className="h-5 w-5 shrink-0 text-text-3" /> : <ChevronDown className="h-5 w-5 shrink-0 text-text-3" />}
+        </button>
+        {isOpen && <div className="border-t border-border p-5">{children}</div>}
+      </section>
+    );
+  }
 
   function updateItem(
     id: string,
@@ -336,99 +371,83 @@ function HRReviewDetail() {
         </aside>
 
         {/* Main Content - Review Layers */}
-        <div className="space-y-6">
-          {/* Faculty Selection */}
-          <AppraisalReviewLayer
-            title="Faculty Claimed"
-            description="Points selected by faculty member in their appraisal submission"
-            items={appraisal.items.map((it: any) => ({
-              itemId: it.id,
-              heading: it.heading ?? it.key,
-              approvedPoints: it.facultyPoints,
-              evidence:
-                it.evidence?.url
-                  ? [{ url: fullEvidenceUrl(it.evidence.url), fileName: it.evidence.fileName }]
-                  : undefined,
-            }))}
-          />
+        <div className="space-y-4">
+          {/* Faculty Claimed */}
+          <AccordionSection sectionKey="faculty" title="Faculty Claimed" description="Points selected by faculty member in their appraisal submission">
+            <AppraisalReviewLayer
+              title="Faculty Claimed"
+              items={appraisal.items.map((it: any, idx: number) => ({
+                itemId: it.id,
+                heading: `${idx + 1}. ${it.heading ?? it.key}`,
+                approvedPoints: it.facultyPoints,
+                evidence:
+                  Array.isArray(it.evidence) && it.evidence.length > 0
+                    ? it.evidence.map((e: any) => ({ url: fullEvidenceUrl(e.url), fileName: e.fileName }))
+                    : undefined,
+              }))}
+            />
+          </AccordionSection>
 
-          {/* HOD Review */}
-          <AppraisalReviewLayer
-            title="HOD Evaluation"
-            description="Points approved by Head of Department with remarks"
-            items={appraisal.items.map((it: any) => ({
-              itemId: it.id,
-              heading: it.heading ?? it.key,
-              approvedPoints: it.hodApprovedPoints ?? it.facultyPoints,
-              previousPoints: it.facultyPoints,
-              remark: it.hodRemark,
-              reviewer: "HOD",
-            }))}
-          />
+          {/* HOD Evaluation */}
+          <AccordionSection sectionKey="hod" title="HOD Evaluation" description="Points approved by Head of Department with remarks">
+            <AppraisalReviewLayer
+              title="HOD Evaluation"
+              items={appraisal.items.map((it: any, idx: number) => ({
+                itemId: it.id,
+                heading: `${idx + 1}. ${it.heading ?? it.key}`,
+                approvedPoints: it.hodApprovedPoints ?? it.facultyPoints,
+                previousPoints: it.facultyPoints,
+                remark: it.hodRemark,
+                reviewer: "HOD",
+              }))}
+            />
+          </AccordionSection>
 
-          {/* Committee Review */}
-          {appraisal.items.some((it: any) => it.committeeApprovedPoints) && (
+          {/* Committee Evaluation */}
+          <AccordionSection sectionKey="committee" title="Committee Evaluation" description="Points approved by committee members with remarks">
             <AppraisalReviewLayer
               title="Committee Evaluation"
-              description="Points approved by committee members with remarks"
-              items={appraisal.items.map((it: any) => ({
+              items={appraisal.items.map((it: any, idx: number) => ({
                 itemId: it.id,
-                heading: it.heading ?? it.key,
-                approvedPoints:
-                  it.committeeApprovedPoints ??
-                  it.hodApprovedPoints ??
-                  it.facultyPoints,
+                heading: `${idx + 1}. ${it.heading ?? it.key}`,
+                approvedPoints: it.committeeApprovedPoints ?? it.hodApprovedPoints ?? it.facultyPoints,
                 previousPoints: it.hodApprovedPoints ?? it.facultyPoints,
                 remark: it.committeeRemark,
                 reviewer: "Committee",
               }))}
             />
-          )}
+          </AccordionSection>
 
-          {/* HR Review - Current Review or View */}
-          <AppraisalReviewLayer
-            title="HR Final Review"
-            description={
-              canEdit
-                ? "Review and finalize points for this appraisal cycle"
-                : "Points approved by HR"
-            }
-            isCurrentReview={canEdit}
-            items={appraisal.items.map((it: any) => ({
-              itemId: it.id,
-              heading: it.heading ?? it.key,
-              approvedPoints: canEdit
-                ? itemState[it.id]?.approvedPoints ?? 0
-                : (it.hrApprovedPoints ??
-                  it.committeeApprovedPoints ??
-                  it.hodApprovedPoints ??
-                  it.facultyPoints),
-              previousPoints:
-                it.committeeApprovedPoints ??
-                it.hodApprovedPoints ??
-                it.facultyPoints,
-              remark: canEdit
-                ? itemState[it.id]?.remark || ""
-                : it.hrRemark || it.committeeRemark || "",
-              reviewer: "HR",
-            }))}
-            itemInputs={
-              canEdit
-                ? appraisal.items.reduce((acc: any, it: any) => {
-                    acc[it.id] = {
-                      approvedPointsValue:
-                        itemState[it.id]?.approvedPoints ?? 0,
-                      remarkValue: itemState[it.id]?.remark || "",
-                      onApprovedPointsChange: (value: number) =>
-                        updateItem(it.id, { approvedPoints: value }),
-                      onRemarkChange: (value: string) =>
-                        updateItem(it.id, { remark: value }),
-                    };
-                    return acc;
-                  }, {})
-                : undefined
-            }
-          />
+          {/* HR Final Review */}
+          <AccordionSection sectionKey="hr" title="HR Final Review" description={canEdit ? "Review and finalize points for this appraisal cycle" : "Points approved by HR"}>
+            <AppraisalReviewLayer
+              title="HR Final Review"
+              isCurrentReview={canEdit}
+              items={appraisal.items.map((it: any, idx: number) => ({
+                itemId: it.id,
+                heading: `${idx + 1}. ${it.heading ?? it.key}`,
+                approvedPoints: canEdit
+                  ? itemState[it.id]?.approvedPoints ?? 0
+                  : it.hrApprovedPoints ?? it.committeeApprovedPoints ?? it.hodApprovedPoints ?? it.facultyPoints,
+                previousPoints: it.committeeApprovedPoints ?? it.hodApprovedPoints ?? it.facultyPoints,
+                remark: canEdit ? itemState[it.id]?.remark || "" : it.hrRemark || it.committeeRemark || "",
+                reviewer: "HR",
+              }))}
+              itemInputs={
+                canEdit
+                  ? appraisal.items.reduce((acc: any, it: any) => {
+                      acc[it.id] = {
+                        approvedPointsValue: itemState[it.id]?.approvedPoints ?? 0,
+                        remarkValue: itemState[it.id]?.remark || "",
+                        onApprovedPointsChange: (value: number) => updateItem(it.id, { approvedPoints: value }),
+                        onRemarkChange: (value: string) => updateItem(it.id, { remark: value }),
+                      };
+                      return acc;
+                    }, {})
+                  : undefined
+              }
+            />
+          </AccordionSection>
 
           {/* Super Admin Approval — shown after FULLY_APPROVED */}
           {appraisal.superAdminApprovedPercent != null && (

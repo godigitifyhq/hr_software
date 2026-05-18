@@ -7,7 +7,7 @@ export const facultyProfileSchema = z.object({
   dob: z.string().min(1, "Date of birth is required"),
   dateOfJoining: z.string().min(1, "Date of joining is required"),
   currentSalary: numericString.min(0, "Current salary is required"),
-  lastIncrementDate: z.string().min(1, "Last increment date is required"),
+  lastIncrementDate: z.string().optional().nullable(),
   tenthMarks: numericString.min(0, "10th marks are required"),
   twelfthMarks: numericString.min(0, "12th marks are required"),
   totalExperience: numericString.min(0, "Total experience is required"),

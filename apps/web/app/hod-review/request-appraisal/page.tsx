@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   ExternalLink,
   Loader2,
   SendHorizontal,
   Upload,
+  X,
 } from "lucide-react";
 import { withAuth } from "@/components/auth/withAuth";
 import { AppShell } from "@/components/layout/AppShell";
@@ -27,12 +29,12 @@ type CriterionState = {
   selectedValue: string;
   points: number;
   uploading: boolean;
-  evidence: FacultyEvidenceUpload | null;
+  evidence: FacultyEvidenceUpload[] | null;
 };
 
 type PendingUpload = {
   criterionKey: string;
-  file: File;
+  files: File[];
 };
 
 function HodSelfRequestPage() {
@@ -193,7 +195,7 @@ function HodSelfRequestPage() {
         [criterionKey]: {
           ...current[criterionKey],
           uploading: false,
-          evidence: response.data,
+          evidence: [...(current[criterionKey]?.evidence ?? []), response.data],
         },
       }));
     } catch (uploadError: any) {
@@ -252,7 +254,20 @@ function HodSelfRequestPage() {
     const upload = pendingUpload;
     setPendingUpload(null);
     setConfirmUploadOpen(false);
-    await uploadEvidence(upload.criterionKey, upload.file);
+    for (const file of upload.files) {
+      // eslint-disable-next-line no-await-in-loop
+      await uploadEvidence(upload.criterionKey, file);
+    }
+  }
+
+  function removeEvidence(criterionKey: string, idx: number) {
+    setCriteriaState((current) => ({
+      ...current,
+      [criterionKey]: {
+        ...current[criterionKey],
+        evidence: (current[criterionKey]?.evidence ?? []).filter((_, i) => i !== idx),
+      },
+    }));
   }
 
   if (loading) {
@@ -289,17 +304,40 @@ function HodSelfRequestPage() {
       />
 
       {status?.hasRequest ? (
-        <section className="rounded-2xl border border-success/20 bg-success-bg p-6 text-success">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5" />
-            <p className="text-sm font-medium">
-              You have already submitted self appraisal for this cycle.
-            </p>
+        <section className="rounded-2xl border border-success/20 bg-success-bg p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="text-success">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <p className="text-sm font-semibold">
+                  Self appraisal submitted for this cycle.
+                </p>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <div className="rounded-xl bg-success/10 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest opacity-70">Status</p>
+                  <p className="mt-1 text-sm font-bold">{status.status?.replace(/_/g, " ")}</p>
+                </div>
+                <div className="rounded-xl bg-success/10 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest opacity-70">Total Points</p>
+                  <p className="mt-1 text-sm font-bold">{status.totalPoints ?? 0}</p>
+                </div>
+                <div className="rounded-xl bg-success/10 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest opacity-70">Increment</p>
+                  <p className="mt-1 text-sm font-bold">{status.incrementPercent ?? 0}%</p>
+                </div>
+              </div>
+            </div>
+            {status.appraisalId ? (
+              <Link
+                href={`/faculty-dashboard/appraisals/${status.appraisalId}/view`}
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-success/30 bg-white/60 px-4 text-sm font-medium text-success transition hover:bg-white/90"
+              >
+                View Form
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : null}
           </div>
-          <p className="mt-2 text-sm">
-            Status: {status.status} | Total points: {status.totalPoints ?? 0} |
-            Increment: {status.incrementPercent ?? 0}%
-          </p>
         </section>
       ) : (
         <>
@@ -391,13 +429,16 @@ function HodSelfRequestPage() {
                           <input
                             type="file"
                             accept="image/jpeg,image/png,application/pdf"
+                            multiple
                             className="hidden"
                             onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              if (file) {
+                              const files = Array.from(
+                                event.target.files || [],
+                              );
+                              if (files.length > 0) {
                                 setPendingUpload({
                                   criterionKey: criterion.key,
-                                  file,
+                                  files,
                                 });
                                 setConfirmUploadOpen(true);
                               }
@@ -408,29 +449,35 @@ function HodSelfRequestPage() {
                         <p className="mt-1 text-xs text-text-3">
                           JPG, PNG, or PDF. Max 5MB.
                         </p>
-                        {state?.evidence ? (
-                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                            <p className="text-success">
-                              Uploaded: {state.evidence.fileName}
-                            </p>
-                            {(state.evidence.viewUrl ||
-                              state.evidence.url ||
-                              state.evidence.directUrl) && (
-                              <a
-                                href={
-                                  state.evidence.viewUrl ||
-                                  state.evidence.url ||
-                                  state.evidence.directUrl ||
-                                  "#"
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 font-semibold text-brand hover:text-brand-dark"
+                        {state?.evidence && state.evidence.length > 0 ? (
+                          <div className="mt-2 flex flex-col gap-1.5 text-xs">
+                            {state.evidence.map((e, idx) => (
+                              <div
+                                key={`${e.fileName}-${idx}`}
+                                className="flex items-center gap-2"
                               >
-                                View file
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            )}
+                                <p className="truncate text-success">{e.fileName}</p>
+                                {(e.viewUrl || e.url || e.directUrl) && (
+                                  <a
+                                    href={e.viewUrl || e.url || e.directUrl || "#"}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex shrink-0 items-center gap-1 font-semibold text-brand hover:text-brand-dark"
+                                  >
+                                    View file
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                                <button
+                                  type="button"
+                                  aria-label="Remove evidence"
+                                  onClick={() => removeEvidence(criterion.key, idx)}
+                                  className="ml-auto shrink-0 rounded p-0.5 text-text-3 transition hover:bg-danger-bg hover:text-danger"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         ) : null}
                       </div>
@@ -479,7 +526,9 @@ function HodSelfRequestPage() {
         title="Confirm evidence upload"
         description={
           pendingUpload
-            ? `Upload ${pendingUpload.file.name} for this criterion? This file will be shared with reviewers.`
+            ? pendingUpload.files.length > 1
+              ? `Upload ${pendingUpload.files.length} files for this criterion? These files will be shared with reviewers.`
+              : `Upload ${pendingUpload.files[0].name} for this criterion? This file will be shared with reviewers.`
             : "Upload this evidence file?"
         }
         confirmLabel="Upload file"

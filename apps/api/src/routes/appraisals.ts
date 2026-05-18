@@ -242,8 +242,23 @@ router.get(
           .json({ success: false, message: "Authentication required" });
       }
 
+      const committeeCycleParam =
+        typeof req.query.cycleId === "string" ? req.query.cycleId : null;
+
+      let committeeCycleId: string | null = null;
+      if (committeeCycleParam && committeeCycleParam !== "all") {
+        committeeCycleId = committeeCycleParam;
+      } else if (!committeeCycleParam) {
+        const activeCycle = await prisma.appraisalCycle.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        committeeCycleId = activeCycle?.id ?? null;
+      }
+
       const appraisals = await prisma.appraisal.findMany({
         where: {
+          ...(committeeCycleId ? { cycleId: committeeCycleId } : {}),
           status: { in: ["HOD_REVIEW", "COMMITTEE_REVIEW", "HR_FINALIZED", "FULLY_APPROVED"] },
           OR: [
             {
@@ -540,12 +555,16 @@ router.post(
       const isHr =
         req.auth?.roles?.includes("HR") ||
         req.auth?.roles?.includes("SUPER_ADMIN");
+      const isCommittee = req.auth?.roles?.includes("COMMITTEE") ?? false;
+      const hasNoAssignment = appraisal.committeeAssignments.length === 0;
       const isAssignedCommitteeMember = appraisal.committeeAssignments.some(
         (assignment) =>
           assignment.committee.members.some((member) => member.id === userId),
       );
 
-      if (!isHr && !isAssignedCommitteeMember) {
+      // Allow: HR/super-admin, assigned committee members, or any committee
+      // member when the appraisal has no specific committee assignment.
+      if (!isHr && !isAssignedCommitteeMember && !(isCommittee && hasNoAssignment)) {
         return res
           .status(403)
           .json({ success: false, message: "Access denied" });
