@@ -11,6 +11,40 @@ export type AuthClaims = {
 
 export type AuthenticatedRequest = Request & { auth?: AuthClaims };
 
+type CachedUserState = {
+    lockedUntil: Date | null;
+    deletedAt: Date | null;
+    cachedAt: number;
+};
+
+// Short-lived cache to avoid a DB round-trip on every request for the same user.
+// In serverless (Vercel), this helps warm instances handling multiple requests per container.
+const USER_STATE_CACHE = new Map<string, CachedUserState>();
+const USER_CACHE_TTL_MS = 30_000; // 30 seconds
+
+function getCachedUserState(userId: string): CachedUserState | null {
+    const entry = USER_STATE_CACHE.get(userId);
+    if (!entry) return null;
+    if (Date.now() - entry.cachedAt > USER_CACHE_TTL_MS) {
+        USER_STATE_CACHE.delete(userId);
+        return null;
+    }
+    return entry;
+}
+
+function setCachedUserState(userId: string, state: Omit<CachedUserState, 'cachedAt'>) {
+    // Prevent unbounded growth — evict oldest when over 500 entries
+    if (USER_STATE_CACHE.size >= 500) {
+        const firstKey = USER_STATE_CACHE.keys().next().value;
+        if (firstKey) USER_STATE_CACHE.delete(firstKey);
+    }
+    USER_STATE_CACHE.set(userId, { ...state, cachedAt: Date.now() });
+}
+
+export function invalidateUserCache(userId: string) {
+    USER_STATE_CACHE.delete(userId);
+}
+
 export async function authenticateRequest(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
         const authorization = req.headers.authorization;
@@ -21,17 +55,27 @@ export async function authenticateRequest(req: AuthenticatedRequest, res: Respon
         const token = authorization.slice('Bearer '.length);
         const claims = verifyToken<AuthClaims>(token);
 
-        // load user to validate account state (locked, deleted)
-        const user = await prisma.user.findUnique({ where: { id: claims.sub }, select: { id: true, lockedUntil: true, deletedAt: true, email: true } });
-        if (!user) {
-            return res.status(401).json({ success: false, message: 'User not found' });
+        let userState = getCachedUserState(claims.sub);
+
+        if (!userState) {
+            const user = await prisma.user.findUnique({
+                where: { id: claims.sub },
+                select: { id: true, lockedUntil: true, deletedAt: true },
+            });
+
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'User not found' });
+            }
+
+            userState = { lockedUntil: user.lockedUntil, deletedAt: user.deletedAt };
+            setCachedUserState(claims.sub, userState);
         }
 
-        if (user.deletedAt) {
+        if (userState.deletedAt) {
             return res.status(403).json({ success: false, message: 'Account disabled' });
         }
 
-        if (user.lockedUntil && user.lockedUntil > new Date()) {
+        if (userState.lockedUntil && userState.lockedUntil > new Date()) {
             return res.status(403).json({ success: false, message: 'Account temporarily locked' });
         }
 
@@ -56,4 +100,3 @@ export function requireRoles(...allowedRoles: string[]) {
         return next();
     };
 }
-

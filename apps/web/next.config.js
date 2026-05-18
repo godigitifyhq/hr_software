@@ -12,6 +12,16 @@ const nextConfig = {
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
+
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "drive.google.com" },
+      { protocol: "https", hostname: "drive.usercontent.google.com" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+    ],
+    formats: ["image/avif", "image/webp"],
+  },
+
   headers: async () => [
     {
       source: "/:path*",
@@ -22,7 +32,22 @@ const nextConfig = {
         { key: "Referrer-Policy", value: "no-referrer" },
       ],
     },
+    // Cache static assets aggressively — Next.js content-hashes these filenames
+    {
+      source: "/_next/static/:path*",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+      ],
+    },
+    // Cache public assets for 1 week
+    {
+      source: "/favicon.ico",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" },
+      ],
+    },
   ],
+
   env: {
     NEXT_PUBLIC_API_URL:
       process.env.NEXT_PUBLIC_API_URL ||

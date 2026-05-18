@@ -762,23 +762,26 @@ router.get(
         return;
       }
 
-      // Get user's join date for window check
-      const profile = await prisma.facultyProfile.findUnique({
-        where: { userId },
-        select: { dateOfJoining: true },
-      });
-
       const today = new Date();
+
+      // Fetch profile and active cycle in parallel — both independent
+      const [profile, cycle] = await Promise.all([
+        prisma.facultyProfile.findUnique({
+          where: { userId },
+          select: { dateOfJoining: true },
+        }),
+        prisma.appraisalCycle.findFirst({
+          where: { isActive: true },
+          orderBy: { startDate: "desc" },
+        }),
+      ]);
+
       const windowResult = checkAppraisalWindow(
         profile?.dateOfJoining ?? null,
         today,
       );
 
-      // Soft-fail if no active cycle (return inWindow status anyway)
-      let cycle: { id: string; name: string; endDate: Date } | null = null;
-      try {
-        cycle = await getActiveCycleOrThrow();
-      } catch {
+      if (!cycle) {
         res.json({
           success: true,
           message: "No active cycle",
@@ -794,10 +797,7 @@ router.get(
       }
 
       const appraisal = await prisma.appraisal.findFirst({
-        where: {
-          userId,
-          cycleId: cycle.id,
-        },
+        where: { userId, cycleId: cycle.id },
         select: {
           id: true,
           status: true,

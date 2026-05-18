@@ -186,18 +186,12 @@ router.get(
           .json({ success: false, message: "Authentication required" });
       }
 
-      const departments = await prisma.department.findMany({
-        where: { hodId },
-      });
-
-      const deptIds = departments.map((department) => department.id);
-
       const appraisals = await prisma.appraisal.findMany({
         where: {
           status: { in: ["SUBMITTED", "HOD_REVIEW"] },
           user: {
-            departmentId: { in: deptIds },
             id: { not: hodId },
+            department: { hodId },
           },
         },
         include: {
@@ -248,17 +242,6 @@ router.get(
           .json({ success: false, message: "Authentication required" });
       }
 
-      const committeeIds = await prisma.committee
-        .findMany({
-          where: {
-            members: {
-              some: { id: userId },
-            },
-          },
-          select: { id: true },
-        })
-        .then((committees) => committees.map((committee) => committee.id));
-
       const appraisals = await prisma.appraisal.findMany({
         where: {
           status: { in: ["HOD_REVIEW", "COMMITTEE_REVIEW", "HR_FINALIZED", "FULLY_APPROVED"] },
@@ -266,7 +249,7 @@ router.get(
             {
               committeeAssignments: {
                 some: {
-                  committeeId: { in: committeeIds },
+                  committee: { members: { some: { id: userId } } },
                 },
               },
             },
@@ -346,12 +329,7 @@ router.get(
   authenticateRequest,
   async (req: AuthenticatedRequest, res, next) => {
     try {
-      console.log("[Appraisals API] GET /appraisals", {
-        auth: { sub: req.auth?.sub, roles: req.auth?.roles },
-      });
-
       if (!req.auth?.sub) {
-        console.log("[Appraisals API] No auth.sub in request");
         return res
           .status(401)
           .json({ success: false, message: "Authentication required" });
@@ -373,15 +351,12 @@ router.get(
         orderBy: { createdAt: "desc" },
       });
 
-      console.log("[Appraisals API] Found", appraisals.length, "appraisals");
-
       res.json({
         success: true,
         message: "Appraisals retrieved",
         data: appraisals,
       });
     } catch (error) {
-      console.error("[Appraisals API] Error:", error);
       next(error);
     }
   },

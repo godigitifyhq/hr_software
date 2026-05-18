@@ -20,23 +20,10 @@ export const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use((config) => {
   const { session } = useAuthStore.getState();
 
-  if (typeof window !== "undefined") {
-    // Debug: log the authorization setup
-    console.log("[API Client] Setting up request for:", config.url, {
-      hasSession: !!session,
-      hasToken: !!session?.accessToken,
-      token: session?.accessToken
-        ? `${session.accessToken.substring(0, 20)}...`
-        : "NONE",
-    });
-  }
-
-  // Add Authorization header with access token
   if (session?.accessToken) {
     config.headers["Authorization"] = `Bearer ${session.accessToken}`;
   }
 
-  // Add CSRF token from cookie
   if (typeof document !== "undefined") {
     const csrfToken = document.cookie
       .split("; ")

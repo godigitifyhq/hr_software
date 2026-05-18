@@ -47,7 +47,11 @@ type RefreshClaims = {
   jti: string;
 };
 
+let _mailer: nodemailer.Transporter | null = null;
+
 function getMailer() {
+  if (_mailer) return _mailer;
+
   const host = process.env.EMAIL_SMTP_HOST;
   const user = process.env.EMAIL_SMTP_USER;
   const pass = process.env.EMAIL_SMTP_PASS;
@@ -56,12 +60,13 @@ function getMailer() {
     throw new Error("Email transport is not configured");
   }
 
-  return nodemailer.createTransport({
+  _mailer = nodemailer.createTransport({
     host,
     port: Number(process.env.EMAIL_SMTP_PORT || 587),
     secure: process.env.EMAIL_SMTP_SECURE === "true",
     auth: { user, pass },
   });
+  return _mailer;
 }
 
 function getRefreshExpiry() {
@@ -222,48 +227,36 @@ export async function login(
         },
       });
 
-      await recordLoginAttempt({
-        email: input.email,
-        userId: user.id,
-        success: false,
-        reason: "invalid_password",
-        context,
-      });
-      await writeAuditLog({
-        actorId: user.id,
-        action: "auth.login.failed",
-        resource: "User",
-        resourceId: user.id,
-        meta: { reason: "invalid_password", failedLoginCount },
-      });
+      void Promise.all([
+        recordLoginAttempt({ email: input.email, userId: user.id, success: false, reason: "invalid_password", context }),
+        writeAuditLog({ actorId: user.id, action: "auth.login.failed", resource: "User", resourceId: user.id, meta: { reason: "invalid_password", failedLoginCount } }),
+      ]).catch((e) => console.error("Failed login audit write failed:", e));
       throw new Error("Invalid credentials");
     }
 
-    const refreshedUser = await prisma.user.update({
+    // Update login metadata without a separate re-fetch — user already has roles+department
+    await prisma.user.update({
       where: { id: user.id },
       data: {
         failedLoginCount: 0,
         lockedUntil: null,
         lastLoginAt: new Date(),
       },
-      include: { roles: true },
     });
 
-    const session = await createSession(refreshedUser, context);
+    const session = await createSession(user, context);
 
-    await recordLoginAttempt({
-      email: input.email,
-      userId: user.id,
-      success: true,
-      context,
-    });
-    await writeAuditLog({
-      actorId: user.id,
-      action: "auth.login.success",
-      resource: "User",
-      resourceId: user.id,
-      meta: { ipAddress: context.ipAddress, userAgent: context.userAgent },
-    });
+    // Fire-and-forget: don't block the login response on audit writes
+    void Promise.all([
+      recordLoginAttempt({ email: input.email, userId: user.id, success: true, context }),
+      writeAuditLog({
+        actorId: user.id,
+        action: "auth.login.success",
+        resource: "User",
+        resourceId: user.id,
+        meta: { ipAddress: context.ipAddress, userAgent: context.userAgent },
+      }),
+    ]).catch((e) => console.error("Login audit write failed:", e));
 
     return session;
   } catch (error: any) {
@@ -353,7 +346,7 @@ export async function refreshSession(
   });
   const csrfToken = createCsrfToken();
 
-  await writeAuditLog({
+  void writeAuditLog({
     actorId: user.id,
     action: "auth.refresh.success",
     resource: "RefreshToken",
@@ -363,7 +356,7 @@ export async function refreshSession(
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
     },
-  });
+  }).catch((e) => console.error("Refresh audit write failed:", e));
 
   return { accessToken, refreshToken: newRefreshToken, csrfToken, user };
 }

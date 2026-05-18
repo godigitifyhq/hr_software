@@ -179,6 +179,11 @@ model Appraisal {
   committeeAssignments CommitteeAssignment[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([cycleId])
+  @@index([userId, cycleId])
 }
 
 model AppraisalItem {
@@ -190,6 +195,8 @@ model AppraisalItem {
   weight        Float
   notes         String?
   createdAt     DateTime @default(now())
+
+  @@index([appraisalId])
 }
 
 model ScoringConfig {
@@ -210,6 +217,8 @@ model MemoDeduction {
   count     Int
   pointsDeducted Int
   createdAt DateTime @default(now())
+
+  @@index([userId, cycleId])
 }
 
 model LoginAttempt {
@@ -253,6 +262,9 @@ model CommitteeAssignment {
   appraisalId String
   appraisal   Appraisal @relation(fields: [appraisalId], references: [id])
   assignedAt  DateTime @default(now())
+
+  @@index([appraisalId])
+  @@index([committeeId])
 }
 
 model AuditLog {
@@ -265,6 +277,9 @@ model AuditLog {
   meta       String?
   createdAt  DateTime @default(now())
   immutable  Boolean  @default(true)
+
+  @@index([actorId, createdAt])
+  @@index([resource, resourceId])
 }
 
 model Publication {
