@@ -58,7 +58,7 @@ export default function SuperAdminDashboard() {
   const role = getPrimaryRole(session?.user.roles ?? []);
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,15 +86,9 @@ export default function SuperAdminDashboard() {
       setLoading(true);
       setError(null);
 
-      const [statsRes, usersRes, logsRes] = await Promise.all([
-        apiClient.get("/admin/statistics"),
-        apiClient.get("/admin/users"),
-        apiClient.get("/admin/audit-logs"),
-      ]);
-
-      setStats(statsRes.data.data);
-      setUsers(usersRes.data.data);
-      setLogs(logsRes.data.data);
+      const res = await apiClient.get("/admin/dashboard");
+      setStats(res.data.data.stats);
+      setUsers(res.data.data.users);
     } catch (err: any) {
       const message =
         err?.response?.data?.message || "Failed to load admin dashboard";

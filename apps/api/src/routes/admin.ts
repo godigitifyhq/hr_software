@@ -10,6 +10,47 @@ import { writeAuditLog } from "../lib/audit";
 
 const router: express.Router = express.Router();
 
+// Combined dashboard endpoint — replaces separate /statistics + /users + /audit-logs calls
+router.get(
+  "/dashboard",
+  authenticateRequest,
+  requireRoles("SUPER_ADMIN"),
+  async (_req: AuthenticatedRequest, res, next) => {
+    try {
+      const [totalUsers, totalAppraisals, appraisalsByStatus, roleDistribution, users] =
+        await Promise.all([
+          prisma.user.count(),
+          prisma.appraisal.count(),
+          prisma.appraisal.groupBy({ by: ["status"], _count: true }),
+          prisma.userRole.groupBy({ by: ["role"], _count: true }),
+          prisma.user.findMany({
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              createdAt: true,
+              updatedAt: true,
+              roles: { select: { role: true } },
+            },
+            orderBy: { createdAt: "desc" },
+          }),
+        ]);
+
+      res.json({
+        success: true,
+        message: "Admin dashboard",
+        data: {
+          stats: { totalUsers, totalAppraisals, appraisalsByStatus, roleDistribution },
+          users,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 // Get all users with their roles
 router.get(
   "/users",

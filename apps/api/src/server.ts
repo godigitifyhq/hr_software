@@ -58,7 +58,7 @@ app.use(
 // In production, apply a more conservative limit
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === "production" ? 200 : 10000, // 10k in dev, 200 in prod
+  max: process.env.NODE_ENV === "production" ? 1000 : 10000,
   skip: (_req, _res) => process.env.NODE_ENV !== "production", // Skip rate limiting entirely in dev
 });
 app.use(limiter);
