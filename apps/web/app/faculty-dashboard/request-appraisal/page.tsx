@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ConfirmDialog } from "@/components/ui";
 import { api, type AppraisalSummary } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";
+import { toDriveViewerUrl } from "@/lib/utils/drive";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 import type {
@@ -78,12 +79,12 @@ function normalizeDriveUrl(value: string) {
 function resolveEvidenceUrl(url: string) {
   if (!url) return url;
   if (url.startsWith("http")) {
-    return normalizeDriveUrl(url);
+    return toDriveViewerUrl(normalizeDriveUrl(url));
   }
   if (url.startsWith("/")) {
-    return `${API_ORIGIN}${url}`;
+    return toDriveViewerUrl(`${API_ORIGIN}${url}`);
   }
-  return url;
+  return toDriveViewerUrl(url);
 }
 
 function FacultyAppraisalRequestPage() {

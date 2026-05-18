@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { toDriveViewerUrl } from "@/lib/utils/drive";
 
 type EvidenceItem = {
   url: string;
@@ -133,7 +134,7 @@ export function AppraisalReviewItem({
             {evidence.map((item, idx) => (
               <a
                 key={idx}
-                href={fullEvidenceUrl(item.url)}
+                href={toDriveViewerUrl(fullEvidenceUrl(item.url))}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2 text-xs text-brand hover:text-brand-dark"

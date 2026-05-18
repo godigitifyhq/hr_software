@@ -20,6 +20,7 @@ import type {
 } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";
 import { ConfirmDialog } from "@/components/ui";
+import { toDriveViewerUrl } from "@/lib/utils/drive";
 
 type DocumentUploadCardProps = {
   config: FacultyDocumentUploadConfig;
@@ -126,11 +127,9 @@ export function DocumentUploadCard({
 
   const previewUrl = document?.directUrl ?? document?.viewUrl ?? null;
   const uploadedUrl = document?.viewUrl ?? document?.directUrl ?? null;
+  const openedUrl = uploadedUrl ? toDriveViewerUrl(uploadedUrl) : null;
   const normalizedPreviewUrl = previewUrl
     ? normalizeDriveUrl(previewUrl)
-    : null;
-  const normalizedUploadedUrl = uploadedUrl
-    ? normalizeDriveUrl(uploadedUrl)
     : null;
   const currentLabel = document?.name || config.label;
   const acceptedFormats = config.accept.map(toReadableMime).join(" / ");
@@ -298,9 +297,9 @@ export function DocumentUploadCard({
             </div>
           )}
 
-          {normalizedUploadedUrl ? (
+          {openedUrl ? (
             <a
-              href={normalizedUploadedUrl}
+              href={openedUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-medium text-text transition hover:bg-surface"
