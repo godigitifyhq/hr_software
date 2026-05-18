@@ -79,7 +79,7 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
         href: "/hr-dashboard/submissions",
         icon: FileText,
       },
-      { label: "Audit Log", href: "/hr-dashboard/audit", icon: Shield },
+      // { label: "Audit Log", href: "/hr-dashboard/audit", icon: Shield },
     ],
   },
   ADMIN: {
@@ -98,12 +98,12 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
         href: "/hr-dashboard/submissions",
         icon: FileText,
       },
-      { label: "Audit Log", href: "/hr-dashboard/audit", icon: Shield },
-      {
-        label: "System Settings",
-        href: "/hr-dashboard/settings",
-        icon: Settings2,
-      },
+      // { label: "Audit Log", href: "/hr-dashboard/audit", icon: Shield },
+      // {
+      //   label: "System Settings",
+      //   href: "/hr-dashboard/settings",
+      //   icon: Settings2,
+      // },
     ],
   },
   SUPER_ADMIN: {
