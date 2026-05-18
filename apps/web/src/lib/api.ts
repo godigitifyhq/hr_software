@@ -35,12 +35,21 @@ export interface SessionUser {
   department?: { id: string; name: string } | null;
 }
 
+export interface HrDepartmentMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  roles: Array<{ role: string }>;
+}
+
 export interface HrDepartmentSummary {
   id: string;
   name: string;
   code?: string | null;
   hodId?: string | null;
   hod?: { id: string; firstName: string; lastName: string; email: string } | null;
+  users?: HrDepartmentMember[];
   _count?: { users: number };
 }
 
@@ -227,6 +236,23 @@ export interface FacultyAppraisalDetail {
   items: FacultyAppraisalItemDetail[];
   finalScore?: number | null;
   finalPercent?: number | null;
+}
+
+export interface FacultyCycleSummary {
+  cycle: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+  };
+  appraisal: {
+    id: string;
+    status: AppraisalStatus;
+    submittedAt: string | null;
+    finalScore: number | null;
+    finalPercent: number | null;
+  } | null;
 }
 
 export interface AuditLogEntry {
@@ -480,7 +506,12 @@ export const api = {
       unwrap<Record<string, unknown>>(apiClient.put(`/hr/users/${id}/unblock`)),
     getDepartments: () =>
       unwrap<HrDepartmentSummary[]>(apiClient.get("/hr/departments")),
-    createDepartment: (data: { name: string; code?: string; hodId?: string }) =>
+    createDepartment: (data: {
+      name: string;
+      code?: string;
+      hodId?: string;
+      hod?: { firstName: string; lastName: string; email: string; password: string };
+    }) =>
       unwrap<{ id: string; name: string }>(apiClient.post("/hr/departments", data)),
     updateDepartment: (
       id: string,
@@ -534,6 +565,10 @@ export const api = {
     getAppraisalStatus: () =>
       unwrap<FacultyAppraisalRequestStatus>(
         apiClient.get("/faculty/appraisal/status"),
+      ),
+    getCycles: () =>
+      unwrap<FacultyCycleSummary[]>(
+        apiClient.get("/faculty/appraisal/cycles"),
       ),
     uploadAppraisalEvidence: (
       criterionKey: string,

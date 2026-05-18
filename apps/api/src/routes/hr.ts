@@ -707,7 +707,7 @@ router.put(
 
 // ── Departments ──────────────────────────────────────────────────────────────
 
-// List departments with HOD and member count
+// List departments with HOD, member count, and faculty list
 router.get(
   "/departments",
   authenticateRequest,
@@ -722,6 +722,17 @@ router.get(
           code: true,
           hodId: true,
           hod: { select: { id: true, firstName: true, lastName: true, email: true } },
+          users: {
+            where: { deletedAt: null },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              roles: { select: { role: true } },
+            },
+            orderBy: { firstName: "asc" },
+          },
           _count: { select: { users: true } },
         },
         orderBy: { name: "asc" },
@@ -737,6 +748,14 @@ const createDepartmentSchema = z.object({
   name: z.string().min(1),
   code: z.string().optional(),
   hodId: z.string().optional(),
+  hod: z
+    .object({
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      email: z.string().email(),
+      password: z.string().min(12),
+    })
+    .optional(),
 });
 
 router.post(
@@ -747,7 +766,16 @@ router.post(
     try {
       const input = createDepartmentSchema.parse(req.body ?? {});
 
-      // If assigning a HOD, ensure no other dept already has them
+      // Reject if both hodId and hod credentials provided simultaneously
+      if (input.hodId && input.hod) {
+        res.status(400).json({
+          success: false,
+          message: "Provide either hodId or hod credentials, not both",
+        });
+        return;
+      }
+
+      // If assigning existing HOD, ensure no other dept already has them
       if (input.hodId) {
         const existing = await prisma.department.findFirst({
           where: { hodId: input.hodId, deletedAt: null },
@@ -761,13 +789,59 @@ router.post(
         }
       }
 
+      let resolvedHodId: string | null = input.hodId ?? null;
+
+      // Auto-create HOD user if credentials provided
+      if (input.hod) {
+        const existingUser = await prisma.user.findUnique({
+          where: { email: input.hod.email },
+        });
+        if (existingUser) {
+          res.status(400).json({
+            success: false,
+            message: "A user with this email already exists",
+          });
+          return;
+        }
+
+        const newHod = await registerUser({
+          email: input.hod.email,
+          password: input.hod.password,
+          firstName: input.hod.firstName,
+          lastName: input.hod.lastName,
+        });
+
+        await prisma.userRole.create({
+          data: { userId: newHod.id, role: "HOD" },
+        });
+
+        resolvedHodId = newHod.id;
+
+        await writeAuditLog({
+          actorId: req.auth?.sub || "",
+          action: "hr.hod.created",
+          resource: "User",
+          resourceId: newHod.id,
+          meta: { email: input.hod.email, department: input.name },
+        });
+      }
+
       const department = await prisma.department.create({
         data: {
           name: input.name,
           code: input.code,
-          hodId: input.hodId ?? null,
+          hodId: resolvedHodId,
+          ...(resolvedHodId
+            ? { users: { connect: { id: resolvedHodId } } }
+            : {}),
         },
-        select: { id: true, name: true, code: true, hodId: true },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          hodId: true,
+          hod: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
       });
 
       await writeAuditLog({

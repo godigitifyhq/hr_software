@@ -29,6 +29,37 @@ type ReviewItem = {
   } | null;
 };
 
+const CRITERION_ORDER = [
+  "academics_average_result",
+  "scopus_papers",
+  "impact_factor",
+  "book_chapter_book_patent",
+  "conference_seminar_symposia",
+  "fdp_stp",
+  "research_project_consultancy",
+  "research_guidance",
+  "co_curricular_activities",
+  "attendance",
+  "awards_recognition",
+  "hod_remarks_score",
+  "fee_recovery",
+  "awards_outside_svgoi",
+  "overall_university_result",
+  "placement",
+  "department_university_positions",
+];
+
+function sortByOrder(items: ReviewItem[]): ReviewItem[] {
+  return [...items].sort((a, b) => {
+    const ia = CRITERION_ORDER.indexOf(a.criterionKey);
+    const ib = CRITERION_ORDER.indexOf(b.criterionKey);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
 type RequestDetail = {
   id: string;
   status: string;
@@ -273,7 +304,7 @@ function HodReviewDetailPage() {
       ) : null}
 
       <div className="space-y-4">
-        {detail.items.map((item) => {
+        {sortByOrder(detail.items).map((item) => {
           const approved = Number(
             itemState[item.id]?.approvedPoints ?? item.facultyPoints,
           );

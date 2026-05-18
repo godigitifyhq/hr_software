@@ -1,11 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Loader2, Plus, Pencil, X, Check } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  Loader2,
+  Plus,
+  Pencil,
+  Users,
+  X,
+  Check,
+  UserPlus,
+} from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { withAuth } from "@/components/auth/withAuth";
-import { api, type HrDepartmentSummary, type HrUserSummary } from "@/lib/api";
+import {
+  api,
+  type HrDepartmentSummary,
+  type HrUserSummary,
+} from "@/lib/api";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 
@@ -14,6 +28,18 @@ type EditingState = {
   name: string;
   code: string;
   hodId: string;
+};
+
+type CreateMode = "existing-hod" | "new-hod";
+
+const EMPTY_NEW_DEPT = {
+  name: "",
+  code: "",
+  hodId: "",
+  hodFirstName: "",
+  hodLastName: "",
+  hodEmail: "",
+  hodPassword: "",
 };
 
 function HrDepartmentsPage() {
@@ -25,9 +51,11 @@ function HrDepartmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [createMode, setCreateMode] = useState<CreateMode>("new-hod");
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [newDept, setNewDept] = useState({ name: "", code: "", hodId: "" });
+  const [newDept, setNewDept] = useState(EMPTY_NEW_DEPT);
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
 
   async function loadData() {
     try {
@@ -52,19 +80,52 @@ function HrDepartmentsPage() {
 
   async function handleCreate() {
     if (!newDept.name.trim()) return;
+
+    if (
+      createMode === "new-hod" &&
+      (!newDept.hodFirstName.trim() ||
+        !newDept.hodLastName.trim() ||
+        !newDept.hodEmail.trim() ||
+        !newDept.hodPassword.trim())
+    ) {
+      setError(
+        "All HOD credential fields are required when creating a new HOD.",
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
-      await api.hr.createDepartment({
-        name: newDept.name.trim(),
-        code: newDept.code.trim() || undefined,
-        hodId: newDept.hodId || undefined,
-      });
-      setNewDept({ name: "", code: "", hodId: "" });
+
+      if (createMode === "new-hod") {
+        await api.hr.createDepartment({
+          name: newDept.name.trim(),
+          code: newDept.code.trim() || undefined,
+          hod: {
+            firstName: newDept.hodFirstName.trim(),
+            lastName: newDept.hodLastName.trim(),
+            email: newDept.hodEmail.trim(),
+            password: newDept.hodPassword,
+          },
+        });
+      } else {
+        await api.hr.createDepartment({
+          name: newDept.name.trim(),
+          code: newDept.code.trim() || undefined,
+          hodId: newDept.hodId || undefined,
+        });
+      }
+
+      setNewDept(EMPTY_NEW_DEPT);
       setShowCreate(false);
       await loadData();
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to create department");
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to create department",
+      );
     } finally {
       setSaving(false);
     }
@@ -83,10 +144,26 @@ function HrDepartmentsPage() {
       setEditing(null);
       await loadData();
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to update department");
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to update department",
+      );
     } finally {
       setSaving(false);
     }
+  }
+
+  function toggleDeptExpanded(deptId: string) {
+    setExpandedDepts((prev) => {
+      const next = new Set(prev);
+      if (next.has(deptId)) {
+        next.delete(deptId);
+      } else {
+        next.add(deptId);
+      }
+      return next;
+    });
   }
 
   const hodEligibleUsers = users.filter(
@@ -122,42 +199,168 @@ function HrDepartmentsPage() {
       {showCreate && (
         <div className="mb-6 rounded-2xl border border-brand/30 bg-brand-light/20 p-5 shadow-sm">
           <h3 className="mb-4 font-semibold text-text">Create New Department</h3>
-          <div className="grid gap-3 sm:grid-cols-3">
+
+          {/* Dept name + code */}
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="new-dept-name" className="mb-1 block text-xs font-medium text-text-3">
+              <label
+                htmlFor="new-dept-name"
+                className="mb-1 block text-xs font-medium text-text-3"
+              >
                 Department Name *
               </label>
               <input
                 id="new-dept-name"
                 type="text"
                 value={newDept.name}
-                onChange={(e) => setNewDept((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setNewDept((p) => ({ ...p, name: e.target.value }))
+                }
                 placeholder="e.g. Computer Science"
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
               />
             </div>
             <div>
-              <label htmlFor="new-dept-code" className="mb-1 block text-xs font-medium text-text-3">
+              <label
+                htmlFor="new-dept-code"
+                className="mb-1 block text-xs font-medium text-text-3"
+              >
                 Code
               </label>
               <input
                 id="new-dept-code"
                 type="text"
                 value={newDept.code}
-                onChange={(e) => setNewDept((p) => ({ ...p, code: e.target.value }))}
+                onChange={(e) =>
+                  setNewDept((p) => ({ ...p, code: e.target.value }))
+                }
                 placeholder="e.g. CS"
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
               />
             </div>
+          </div>
+
+          {/* HOD mode toggle */}
+          <div className="mb-4">
+            <p className="mb-2 text-xs font-medium text-text-3">HOD Setup</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateMode("new-hod")}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
+                  createMode === "new-hod"
+                    ? "border-brand bg-brand text-white"
+                    : "border-border bg-surface text-text hover:bg-surface-2"
+                }`}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Create New HOD
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateMode("existing-hod")}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
+                  createMode === "existing-hod"
+                    ? "border-brand bg-brand text-white"
+                    : "border-border bg-surface text-text hover:bg-surface-2"
+                }`}
+              >
+                <Users className="h-3.5 w-3.5" />
+                Assign Existing User
+              </button>
+            </div>
+          </div>
+
+          {createMode === "new-hod" ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="hod-first-name"
+                  className="mb-1 block text-xs font-medium text-text-3"
+                >
+                  HOD First Name *
+                </label>
+                <input
+                  id="hod-first-name"
+                  type="text"
+                  value={newDept.hodFirstName}
+                  onChange={(e) =>
+                    setNewDept((p) => ({ ...p, hodFirstName: e.target.value }))
+                  }
+                  placeholder="First name"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="hod-last-name"
+                  className="mb-1 block text-xs font-medium text-text-3"
+                >
+                  HOD Last Name *
+                </label>
+                <input
+                  id="hod-last-name"
+                  type="text"
+                  value={newDept.hodLastName}
+                  onChange={(e) =>
+                    setNewDept((p) => ({ ...p, hodLastName: e.target.value }))
+                  }
+                  placeholder="Last name"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="hod-email"
+                  className="mb-1 block text-xs font-medium text-text-3"
+                >
+                  HOD Email *
+                </label>
+                <input
+                  id="hod-email"
+                  type="email"
+                  value={newDept.hodEmail}
+                  onChange={(e) =>
+                    setNewDept((p) => ({ ...p, hodEmail: e.target.value }))
+                  }
+                  placeholder="hod@college.edu"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="hod-password"
+                  className="mb-1 block text-xs font-medium text-text-3"
+                >
+                  HOD Password * (min 12 chars)
+                </label>
+                <input
+                  id="hod-password"
+                  type="password"
+                  value={newDept.hodPassword}
+                  onChange={(e) =>
+                    setNewDept((p) => ({ ...p, hodPassword: e.target.value }))
+                  }
+                  placeholder="Temporary password"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
+                />
+              </div>
+            </div>
+          ) : (
             <div>
-              <label htmlFor="new-dept-hod" className="mb-1 block text-xs font-medium text-text-3">
-                Assign HOD
+              <label
+                htmlFor="new-dept-hod"
+                className="mb-1 block text-xs font-medium text-text-3"
+              >
+                Assign Existing User as HOD
               </label>
               <select
                 id="new-dept-hod"
                 title="Assign HOD"
                 value={newDept.hodId}
-                onChange={(e) => setNewDept((p) => ({ ...p, hodId: e.target.value }))}
+                onChange={(e) =>
+                  setNewDept((p) => ({ ...p, hodId: e.target.value }))
+                }
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
               >
                 <option value="">— None —</option>
@@ -168,7 +371,8 @@ function HrDepartmentsPage() {
                 ))}
               </select>
             </div>
-          </div>
+          )}
+
           <div className="mt-4 flex gap-2">
             <button
               type="button"
@@ -176,12 +380,20 @@ function HrDepartmentsPage() {
               disabled={saving || !newDept.name.trim()}
               className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark disabled:opacity-60"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
               Create
             </button>
             <button
               type="button"
-              onClick={() => { setShowCreate(false); setNewDept({ name: "", code: "", hodId: "" }); }}
+              onClick={() => {
+                setShowCreate(false);
+                setNewDept(EMPTY_NEW_DEPT);
+                setCreateMode("new-hod");
+              }}
               className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2"
             >
               <X className="h-4 w-4" />
@@ -202,7 +414,9 @@ function HrDepartmentsPage() {
         <div className="rounded-2xl border border-border bg-surface p-8 text-center shadow-sm">
           <Building2 className="mx-auto mb-3 h-8 w-8 text-text-3" />
           <p className="font-medium text-text">No departments yet</p>
-          <p className="mt-1 text-sm text-text-2">Create your first department to get started.</p>
+          <p className="mt-1 text-sm text-text-2">
+            Create your first department to get started.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -215,34 +429,55 @@ function HrDepartmentsPage() {
               >
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div>
-                    <label htmlFor="edit-dept-name" className="mb-1 block text-xs font-medium text-text-3">Name</label>
+                    <label
+                      htmlFor="edit-dept-name"
+                      className="mb-1 block text-xs font-medium text-text-3"
+                    >
+                      Name
+                    </label>
                     <input
                       id="edit-dept-name"
                       type="text"
                       placeholder="Department name"
                       value={editing.name}
-                      onChange={(e) => setEditing((p) => p && { ...p, name: e.target.value })}
+                      onChange={(e) =>
+                        setEditing((p) => p && { ...p, name: e.target.value })
+                      }
                       className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label htmlFor="edit-dept-code" className="mb-1 block text-xs font-medium text-text-3">Code</label>
+                    <label
+                      htmlFor="edit-dept-code"
+                      className="mb-1 block text-xs font-medium text-text-3"
+                    >
+                      Code
+                    </label>
                     <input
                       id="edit-dept-code"
                       type="text"
                       placeholder="Dept code"
                       value={editing.code}
-                      onChange={(e) => setEditing((p) => p && { ...p, code: e.target.value })}
+                      onChange={(e) =>
+                        setEditing((p) => p && { ...p, code: e.target.value })
+                      }
                       className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label htmlFor="edit-dept-hod" className="mb-1 block text-xs font-medium text-text-3">HOD</label>
+                    <label
+                      htmlFor="edit-dept-hod"
+                      className="mb-1 block text-xs font-medium text-text-3"
+                    >
+                      HOD
+                    </label>
                     <select
                       id="edit-dept-hod"
                       title="Assign HOD"
                       value={editing.hodId}
-                      onChange={(e) => setEditing((p) => p && { ...p, hodId: e.target.value })}
+                      onChange={(e) =>
+                        setEditing((p) => p && { ...p, hodId: e.target.value })
+                      }
                       className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
                     >
                       <option value="">— None —</option>
@@ -261,7 +496,11 @@ function HrDepartmentsPage() {
                     disabled={saving}
                     className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-medium text-text-inv transition hover:bg-brand-dark disabled:opacity-60"
                   >
-                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    {saving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
                     Save
                   </button>
                   <button
@@ -277,9 +516,10 @@ function HrDepartmentsPage() {
             ) : (
               <article
                 key={dept.id}
-                className="rounded-2xl border border-border bg-surface p-4 shadow-sm"
+                className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                {/* Department header */}
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light">
                       <Building2 className="h-5 w-5 text-brand" />
@@ -303,9 +543,19 @@ function HrDepartmentsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-text-2">
-                      {dept._count?.users ?? 0} members
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleDeptExpanded(dept.id)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-text transition hover:bg-surface-2"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{dept._count?.users ?? dept.users?.length ?? 0} members</span>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform ${
+                          expandedDepts.has(dept.id) ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
                     <button
                       type="button"
                       onClick={() =>
@@ -323,6 +573,46 @@ function HrDepartmentsPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Expandable faculty list */}
+                {expandedDepts.has(dept.id) && (
+                  <div className="border-t border-border bg-surface-2 px-4 py-3">
+                    {!dept.users || dept.users.length === 0 ? (
+                      <p className="text-sm text-text-3">
+                        No faculty members assigned to this department.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-3">
+                          Faculty Members
+                        </p>
+                        {dept.users.map((member) => (
+                          <div
+                            key={member.id}
+                            className="flex items-center justify-between rounded-lg bg-surface px-3 py-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-text">
+                                {member.firstName} {member.lastName}
+                              </p>
+                              <p className="text-xs text-text-3">{member.email}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {member.roles.map((r) => (
+                                <span
+                                  key={r.role}
+                                  className="rounded-full bg-brand-light px-2 py-0.5 text-xs font-medium text-brand"
+                                >
+                                  {r.role}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </article>
             ),
           )}

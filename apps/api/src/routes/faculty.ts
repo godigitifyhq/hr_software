@@ -259,6 +259,9 @@ const baseCriteria: PolicyCriterion[] = [
       { value: "more_than_one_award", label: "More than 1 award", points: 4 },
     ],
   },
+];
+
+const hodOnlyCriteria: PolicyCriterion[] = [
   {
     key: "hod_remarks_score",
     heading: "XII. HOD's Remarks",
@@ -270,9 +273,6 @@ const baseCriteria: PolicyCriterion[] = [
       { value: "hod_4", label: "HOD remarks score 4", points: 4 },
     ],
   },
-];
-
-const hodOnlyCriteria: PolicyCriterion[] = [
   {
     key: "fee_recovery",
     heading: "XIII. Fee Recovery",
@@ -358,7 +358,7 @@ const hodOnlyCriteria: PolicyCriterion[] = [
 
 const facultyPolicy: AppraisalPolicy = {
   criteria: [...baseCriteria],
-  maxPoints: 48,
+  maxPoints: 44,
   incrementBrackets: [
     { min: 0, max: 12, incrementPercent: 5 },
     { min: 13, max: 20, incrementPercent: 8 },
@@ -840,6 +840,70 @@ router.get(
           windowClose: windowResult.windowClose,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// List all appraisal cycles with user's submission status
+router.get(
+  "/appraisal/cycles",
+  authenticateRequest,
+  requireRoles("FACULTY", "EMPLOYEE", "HOD", "COMMITTEE", "SUPER_ADMIN"),
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const userId = req.auth?.sub;
+      if (!userId) {
+        res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
+        return;
+      }
+
+      const cycles = await prisma.appraisalCycle.findMany({
+        orderBy: { startDate: "desc" },
+      });
+
+      const appraisals = await prisma.appraisal.findMany({
+        where: { userId, cycleId: { in: cycles.map((c) => c.id) } },
+        select: {
+          id: true,
+          cycleId: true,
+          status: true,
+          submittedAt: true,
+          finalScore: true,
+          finalPercent: true,
+        },
+      });
+
+      const appraisalByCycle = new Map(
+        appraisals.map((a) => [a.cycleId, a]),
+      );
+
+      const data = cycles.map((cycle) => {
+        const appraisal = appraisalByCycle.get(cycle.id) ?? null;
+        return {
+          cycle: {
+            id: cycle.id,
+            name: cycle.name,
+            startDate: cycle.startDate.toISOString(),
+            endDate: cycle.endDate.toISOString(),
+            isActive: cycle.isActive,
+          },
+          appraisal: appraisal
+            ? {
+                id: appraisal.id,
+                status: appraisal.status,
+                submittedAt: appraisal.submittedAt?.toISOString() ?? null,
+                finalScore: appraisal.finalScore ?? null,
+                finalPercent: appraisal.finalPercent ?? null,
+              }
+            : null,
+        };
+      });
+
+      res.json({ success: true, message: "Appraisal cycles", data });
     } catch (error) {
       next(error);
     }

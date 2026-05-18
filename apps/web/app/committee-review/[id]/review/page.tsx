@@ -104,7 +104,9 @@ const CATEGORY_DETAILS: Record<
 
 const CATEGORY_BY_KEY: Record<string, ReviewCategory> = {
   academics_average_result: "Academics",
+  academics_average: "Academics",
   fdp_stp: "Academics",
+  fdf_stp: "Academics",
   overall_university_result: "Academics",
   placement: "Academics",
   department_university_positions: "Academics",
@@ -120,6 +122,59 @@ const CATEGORY_BY_KEY: Record<string, ReviewCategory> = {
   hod_remarks_score: "Others",
   fee_recovery: "Others",
   awards_outside_svgoi: "Others",
+};
+
+const CRITERION_ORDER = [
+  "academics_average_result",
+  "academics_average",
+  "scopus_papers",
+  "impact_factor",
+  "book_chapter_book_patent",
+  "conference_seminar_symposia",
+  "fdp_stp",
+  "fdf_stp",
+  "research_project_consultancy",
+  "research_guidance",
+  "co_curricular_activities",
+  "attendance",
+  "awards_recognition",
+  "hod_remarks_score",
+  "fee_recovery",
+  "awards_outside_svgoi",
+  "overall_university_result",
+  "placement",
+  "department_university_positions",
+];
+
+function sortByOrder(items: ReviewItem[]): ReviewItem[] {
+  return [...items].sort((a, b) => {
+    const ia = CRITERION_ORDER.indexOf(a.criterionKey);
+    const ib = CRITERION_ORDER.indexOf(b.criterionKey);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
+const HEADING_ROMAN_TO_CATEGORY: Record<string, ReviewCategory> = {
+  I: "Academics",
+  II: "Research",
+  III: "Research",
+  IV: "Research",
+  V: "Research",
+  VI: "Academics",
+  VII: "Research",
+  VIII: "Research",
+  IX: "Others",
+  X: "Others",
+  XI: "Others",
+  XII: "Others",
+  XIII: "Others",
+  XIV: "Others",
+  XV: "Academics",
+  XVI: "Academics",
+  XVII: "Others",
 };
 
 function fullEvidenceUrl(url: string) {
@@ -139,7 +194,19 @@ function parseItemNotes(notes: string | null | undefined) {
 }
 
 function getReviewCategory(item: ReviewItem): ReviewCategory {
-  return CATEGORY_BY_KEY[item.criterionKey] ?? "Others";
+  const fromKey = CATEGORY_BY_KEY[item.criterionKey];
+  if (fromKey) return fromKey;
+
+  const romanMatch = item.heading.match(
+    /^(X?I{1,3}|X?IV|X?V?I{0,3}|XIV|XV|XVI|XVII|XVIII)\./,
+  );
+  if (romanMatch) {
+    const roman = romanMatch[1].toUpperCase();
+    const fromRoman = HEADING_ROMAN_TO_CATEGORY[roman];
+    if (fromRoman) return fromRoman;
+  }
+
+  return "Others";
 }
 
 function buildItemPayload(
@@ -326,7 +393,7 @@ function CommitteeReviewPage() {
       return accumulator;
     }, {} as Record<ReviewCategory, ReviewItem[]>);
 
-    appraisal.items.forEach((item) => {
+    sortByOrder(appraisal.items).forEach((item) => {
       grouped[getReviewCategory(item)].push(item);
     });
 
