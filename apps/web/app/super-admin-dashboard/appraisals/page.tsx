@@ -37,21 +37,6 @@ function SuperAdminAppraislalsPage() {
   >([]);
   const [cycles, setCycles] = useState<Array<{ id: string; name: string }>>([]);
 
-  useEffect(() => {
-    if (!session) {
-      router.push("/login");
-      return;
-    }
-
-    if (!session.user.roles.includes("SUPER_ADMIN")) {
-      router.push("/unauthorized");
-      return;
-    }
-
-    loadAppraisals();
-    loadFilters();
-  }, [session, router, loadAppraisals]);
-
   const loadAppraisals = useCallback(async () => {
     try {
       setLoading(true);
@@ -72,6 +57,28 @@ function SuperAdminAppraislalsPage() {
       setLoading(false);
     }
   }, [statusFilter, departmentFilter, cycleFilter]);
+
+  useEffect(() => {
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+
+    if (!session.user.roles.includes("SUPER_ADMIN")) {
+      router.push("/unauthorized");
+      return;
+    }
+
+    loadFilters();
+  }, [session, router]);
+
+  useEffect(() => {
+    if (!session || !session.user.roles.includes("SUPER_ADMIN")) {
+      return;
+    }
+
+    void loadAppraisals();
+  }, [session, loadAppraisals]);
 
   async function loadFilters() {
     try {
@@ -194,7 +201,6 @@ function SuperAdminAppraislalsPage() {
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
-                loadAppraisals();
               }}
               className="mt-2 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text"
             >
@@ -216,7 +222,6 @@ function SuperAdminAppraislalsPage() {
               value={departmentFilter}
               onChange={(e) => {
                 setDepartmentFilter(e.target.value);
-                loadAppraisals();
               }}
               className="mt-2 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text"
             >
@@ -241,7 +246,6 @@ function SuperAdminAppraislalsPage() {
               value={cycleFilter}
               onChange={(e) => {
                 setCycleFilter(e.target.value);
-                loadAppraisals();
               }}
               className="mt-2 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text"
             >
