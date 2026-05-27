@@ -69,12 +69,6 @@ export default function Home() {
               Sign in
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link
-              href="/register"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text transition hover:bg-surface-2"
-            >
-              Create account
-            </Link>
           </div>
         </div>
 
