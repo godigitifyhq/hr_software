@@ -601,7 +601,7 @@ function FacultyAppraisalRequestPage() {
                 <button
                   type="button"
                   onClick={() => void submitRequest()}
-                  disabled={!canSubmit || submitting}
+                  disabled={submitting}
                   className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? (
