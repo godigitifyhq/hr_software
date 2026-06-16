@@ -524,6 +524,7 @@ function FacultyAppraisalRequestPage() {
                             Remarks
                           </label>
                           <textarea
+                            title="Remarks"
                             value={state?.remarks ?? ""}
                             onChange={(event) =>
                               updateCriterionRemarks(
@@ -532,7 +533,7 @@ function FacultyAppraisalRequestPage() {
                               )
                             }
                             rows={2}
-                            placeholder="Author position, publication details, or any additional remarks..."
+
                             className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text"
                           />
                         </div>
@@ -546,7 +547,9 @@ function FacultyAppraisalRequestPage() {
                             )}
                             {state?.uploading
                               ? "Uploading..."
-                              : "Upload evidence"}
+                              : state?.evidence && state.evidence.length > 0
+                                ? "Add another evidence"
+                                : "Upload evidence"}
                             <input
                               type="file"
                               accept="image/jpeg,image/png,application/pdf"

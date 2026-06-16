@@ -438,10 +438,14 @@ function FacultyProfileSection() {
         />
         <div className="space-y-6">
           {error && (
-            <div className="rounded-2xl border border-danger/20 bg-danger-bg p-4 text-sm text-danger">{error}</div>
+            <div className="rounded-2xl border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
+              {error}
+            </div>
           )}
           {message && (
-            <div className="rounded-2xl border border-success/20 bg-success-bg p-4 text-sm text-success">{message}</div>
+            <div className="rounded-2xl border border-success/20 bg-success-bg p-4 text-sm text-success">
+              {message}
+            </div>
           )}
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
@@ -449,8 +453,12 @@ function FacultyProfileSection() {
                 <User className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-text-3">Account</p>
-                <h2 className="font-display text-2xl font-semibold text-text">{displayName || "Admin user"}</h2>
+                <p className="text-xs font-semibold uppercase tracking-widest text-text-3">
+                  Account
+                </p>
+                <h2 className="font-display text-2xl font-semibold text-text">
+                  {displayName || "Admin user"}
+                </h2>
               </div>
             </div>
 
@@ -459,25 +467,9 @@ function FacultyProfileSection() {
               className="grid gap-5 sm:grid-cols-2"
             >
               <div>
-                <label className="block text-sm font-medium text-text">Email</label>
-                <div className="mt-1 flex h-10 items-center gap-2 rounded-lg border border-border bg-bg px-3 text-sm text-text-3">
-                  <Mail className="h-4 w-4 shrink-0" />
-                  {profile?.email ?? session?.user.email ?? "—"}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text">Phone</label>
-                <input
-                  {...register("phone")}
-                  type="tel"
-                  placeholder="e.g. +91 98765 43210"
-                  className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text">Designation</label>
+                <label className="block text-sm font-medium text-text">
+                  Designation
+                </label>
                 <input
                   {...register("designation")}
                   type="text"
@@ -487,11 +479,35 @@ function FacultyProfileSection() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text">Employee Code</label>
+                <label className="block text-sm font-medium text-text">
+                  Employee Code
+                </label>
                 <input
                   {...register("employeeCode")}
                   type="text"
                   placeholder="e.g. EMP001"
+                  className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text">
+                  Email
+                </label>
+                <div className="mt-1 flex h-10 items-center gap-2 rounded-lg border border-border bg-bg px-3 text-sm text-text-3">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  {profile?.email ?? session?.user.email ?? "—"}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text">
+                  Phone
+                </label>
+                <input
+                  {...register("phone")}
+                  type="tel"
+                  placeholder="e.g. +91 98765 43210"
                   className="mt-1 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
                 />
               </div>
@@ -662,48 +678,12 @@ function FacultyProfileSection() {
                 onSubmit={handleSubmit(onSubmit)}
                 className="mt-6 space-y-6"
               >
-                {/* Basic Information */}
+                {/* Professional Information */}
                 <div>
                   <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-3">
-                    Basic Information
+                    Professional Information
                   </h4>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
-                        Email ID
-                      </label>
-                      <div className="flex h-10 w-full items-center rounded-lg border border-border bg-surface px-3 text-sm text-text-2">
-                        {profile?.email ?? session?.user.email ?? "Not set"}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
-                        Phone Number
-                      </label>
-                      <input
-                        {...register("phone")}
-                        placeholder="e.g. +91 98765 43210"
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                      />
-                      {errors.phone ? (
-                        <p className="mt-1 text-xs text-danger">
-                          {errors.phone.message}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
-                        Designation
-                      </label>
-                      <input
-                        {...register("designation")}
-                        placeholder="e.g. Assistant Professor"
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                      />
-                    </div>
-
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-text">
                         Employee Code
@@ -717,68 +697,13 @@ function FacultyProfileSection() {
 
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-text">
-                        College Name
+                        Designation
                       </label>
                       <input
-                        {...register("collegeName")}
-                        placeholder="e.g. SVGOI"
+                        {...register("designation")}
+                        placeholder="e.g. Assistant Professor"
                         className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
                       />
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
-                        Father&apos;s Name
-                      </label>
-                      <input
-                        {...register("fatherName")}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                      />
-                      {errors.fatherName ? (
-                        <p className="mt-1 text-xs text-danger">
-                          {errors.fatherName.message}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
-                        Date of Birth
-                      </label>
-                      <input
-                        type="date"
-                        {...register("dob")}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                      />
-                      {errors.dob ? (
-                        <p className="mt-1 text-xs text-danger">
-                          {errors.dob.message}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Professional Information */}
-                <div>
-                  <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-3">
-                    Professional Information
-                  </h4>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
-                        Date of Joining
-                      </label>
-                      <input
-                        type="date"
-                        {...register("dateOfJoining")}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                      />
-                      {errors.dateOfJoining ? (
-                        <p className="mt-1 text-xs text-danger">
-                          {errors.dateOfJoining.message}
-                        </p>
-                      ) : null}
                     </div>
 
                     <div>
@@ -808,6 +733,41 @@ function FacultyProfileSection() {
                       {errors.departmentId ? (
                         <p className="mt-1 text-xs text-danger">
                           {errors.departmentId.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Date of Joining
+                      </label>
+                      <input
+                        type="date"
+                        {...register("dateOfJoining")}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
+                      {errors.dateOfJoining ? (
+                        <p className="mt-1 text-xs text-danger">
+                          {errors.dateOfJoining.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Total Experience (years)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        {...register("totalExperience", {
+                          valueAsNumber: true,
+                        })}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
+                      {errors.totalExperience ? (
+                        <p className="mt-1 text-xs text-danger">
+                          {errors.totalExperience.message}
                         </p>
                       ) : null}
                     </div>
@@ -844,25 +804,86 @@ function FacultyProfileSection() {
                         </p>
                       ) : null}
                     </div>
+                  </div>
+                </div>
 
+
+                {/* Personal Information */}
+                <div>
+                  <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-3">
+                    Personal Information
+                  </h4>
+                  <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-text">
-                        Total Experience (years)
+                        Father&apos;s Name
                       </label>
                       <input
-                        type="number"
-                        step="0.1"
-                        {...register("totalExperience", { valueAsNumber: true })}
+                        {...register("fatherName")}
                         className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
                       />
-                      {errors.totalExperience ? (
+                      {errors.fatherName ? (
                         <p className="mt-1 text-xs text-danger">
-                          {errors.totalExperience.message}
+                          {errors.fatherName.message}
                         </p>
                       ) : null}
                     </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Date of Birth
+                      </label>
+                      <input
+                        type="date"
+                        {...register("dob")}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
+                      {errors.dob ? (
+                        <p className="mt-1 text-xs text-danger">
+                          {errors.dob.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Phone Number
+                      </label>
+                      <input
+                        {...register("phone")}
+                        placeholder="e.g. +91 98765 43210"
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
+                      {errors.phone ? (
+                        <p className="mt-1 text-xs text-danger">
+                          {errors.phone.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Email ID
+                      </label>
+                      <div className="flex h-10 w-full items-center rounded-lg border border-border bg-surface px-3 text-sm text-text-2">
+                        {profile?.email ?? session?.user.email ?? "Not set"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        College Name
+                      </label>
+                      <input
+                        {...register("collegeName")}
+                        placeholder="e.g. SVGOI"
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
+                    </div>
                   </div>
                 </div>
+
+                
 
                 {/* Academic Qualifications */}
                 <div>
