@@ -176,7 +176,10 @@ function FacultyProfileSection() {
       designation: "",
       employeeCode: "",
       collegeName: "",
+      graduation: "",
+      postGraduation: "",
       otherPgDegree: "",
+      phdDegree: "",
       profileRemarks: "",
     },
   });
@@ -235,7 +238,10 @@ function FacultyProfileSection() {
           designation: profileResponse.data.designation ?? "",
           employeeCode: profileResponse.data.employeeCode ?? "",
           collegeName: profileResponse.data.collegeName ?? "",
+          graduation: profileResponse.data.graduation ?? "",
+          postGraduation: profileResponse.data.postGraduation ?? "",
           otherPgDegree: profileResponse.data.otherPgDegree ?? "",
+          phdDegree: profileResponse.data.phdDegree ?? "",
           profileRemarks: profileResponse.data.profileRemarks ?? "",
         });
       } catch (loadError: any) {
@@ -686,17 +692,6 @@ function FacultyProfileSection() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-text">
-                        Employee Code
-                      </label>
-                      <input
-                        {...register("employeeCode")}
-                        placeholder="e.g. EMP001"
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
                         Designation
                       </label>
                       <input
@@ -735,6 +730,28 @@ function FacultyProfileSection() {
                           {errors.departmentId.message}
                         </p>
                       ) : null}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        College Name
+                      </label>
+                      <input
+                        {...register("collegeName")}
+                        placeholder="e.g. SVGOI"
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Employee Code
+                      </label>
+                      <input
+                        {...register("employeeCode")}
+                        placeholder="e.g. EMP001"
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
                     </div>
 
                     <div>
@@ -807,7 +824,6 @@ function FacultyProfileSection() {
                   </div>
                 </div>
 
-
                 {/* Personal Information */}
                 <div>
                   <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-3">
@@ -869,21 +885,8 @@ function FacultyProfileSection() {
                         {profile?.email ?? session?.user.email ?? "Not set"}
                       </div>
                     </div>
-
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-text">
-                        College Name
-                      </label>
-                      <input
-                        {...register("collegeName")}
-                        placeholder="e.g. SVGOI"
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
-                      />
-                    </div>
                   </div>
                 </div>
-
-                
 
                 {/* Academic Qualifications */}
                 <div>
@@ -891,6 +894,17 @@ function FacultyProfileSection() {
                     Academic Qualifications
                   </h4>
                   <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Graduation (UG) Degree
+                      </label>
+                      <input
+                        {...register("graduation")}
+                        placeholder="e.g. B.Tech, B.Sc"
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
+                      />
+                    </div>
+
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-text">
                         Post Graduation (PG) Degree
@@ -923,20 +937,19 @@ function FacultyProfileSection() {
                         className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-text"
                       />
                     </div>
-                  </div>
-                </div>
 
-                {/* Remarks */}
-                <div>
-                  <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-3">
-                    Remarks
-                  </h4>
-                  <textarea
-                    {...register("profileRemarks")}
-                    rows={3}
-                    placeholder="Any additional remarks or notes about your profile..."
-                    className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text"
-                  />
+                    <div className="md:col-span-2">
+                      <label className="mb-1.5 block text-sm font-medium text-text">
+                        Remarks
+                      </label>
+                      <textarea
+                        {...register("profileRemarks")}
+                        rows={3}
+                        placeholder="Any additional remarks or notes about your profile..."
+                        className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-2">

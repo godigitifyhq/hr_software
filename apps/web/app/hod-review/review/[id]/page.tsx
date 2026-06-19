@@ -39,11 +39,12 @@ type ReviewItem = {
 };
 
 const CRITERION_ORDER = [
-  // Base criteria (I–XVII)
+  // Base criteria (I–XIII)
   "academics_average_result",
   "research_publications",
   "impact_factor",
-  "book_chapter_book_patent",
+  "books_published",
+  "patents",
   "conference_seminar_workshop",
   "fdp_stp",
   "research_project_consultancy",
@@ -51,14 +52,8 @@ const CRITERION_ORDER = [
   "co_curricular_activities",
   "attendance",
   "awards_recognition",
-  "courses_taught",
-  "student_feedback",
-  "exam_results_subject",
-  "invited_lecture",
-  "exam_duties",
-  "outreach_activities",
-  // HOD-only criteria (XVIII–XXIII)
   "hod_remarks_score",
+  // HOD-only criteria (XIV–XVIII)
   "fee_recovery",
   "awards_outside_svgoi",
   "overall_university_result",

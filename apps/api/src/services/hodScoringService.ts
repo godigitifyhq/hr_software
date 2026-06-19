@@ -149,10 +149,10 @@ const defaultPolicy: HODScoringPolicy = {
             { min: 4, points: 4 }
         ],
         feeRecoveryPercent: [
-            { min: 50, max: 69.999, points: 1 },
-            { min: 70, max: 79.999, points: 2 },
-            { min: 80, max: 89.999, points: 3 },
-            { min: 90, points: 4 }
+            { max: 49.999, points: 1 },
+            { min: 50, max: 69.999, points: 2 },
+            { min: 70, max: 79.999, points: 3 },
+            { min: 80, points: 4 }
         ],
         awardsOutsideSvgoiLevel: [
             { min: 1, max: 1, points: 1 },
@@ -186,14 +186,14 @@ const defaultPolicy: HODScoringPolicy = {
         ]
     },
     incrementBrackets: [
-        { max: 12, points: 5, note: '0 to 12 points' },
-        { min: 13, max: 20, points: 8, note: '13 to 20 points' },
-        { min: 21, max: 30, points: 10, note: '21 to 30 points' },
-        { min: 31, points: 15, note: 'More than 30 points' }
+        { max: 20, points: 5, note: '0 to 20 points' },
+        { min: 21, max: 34, points: 8, note: '21 to 34 points' },
+        { min: 35, max: 49, points: 10, note: '35 to 49 points' },
+        { min: 50, points: 15, note: 'Above 49 points' }
     ],
     memoDeductions: {
-        twoMemos: 2,
-        threeOrFourMemos: 4,
+        twoMemos: 4,
+        threeOrFourMemos: 6,
         fiveMemos: 8,
         moreThanFiveNoIncrement: true
     }

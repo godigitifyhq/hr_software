@@ -436,7 +436,7 @@ function HodSelfRequestPage() {
                         <textarea
                           rows={2}
                           value={state?.remarks ?? ""}
-                          placeholder="Add author position, publication details, or any remarks..."
+                          placeholder="Type Your Remarks here"
                           onChange={(event) =>
                             updateCriterionRemarks(
                               criterion.key,
