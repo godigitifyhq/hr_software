@@ -258,6 +258,7 @@ function CommitteeReviewPage() {
   const [remarksScore, setRemarksScore] = useState(0);
   const [remarksScoreRemark, setRemarksScoreRemark] = useState("");
   const [hodAdditionalPoints, setHodAdditionalPoints] = useState(0);
+  const [hodAdditionalPointsRemark, setHodAdditionalPointsRemark] = useState("");
   const [hodOverallRemark, setHodOverallRemark] = useState("");
 
   useEffect(() => {
@@ -346,6 +347,9 @@ function CommitteeReviewPage() {
             : null;
           if (typeof hodRemarksData?.additionalPoints === "number") {
             setHodAdditionalPoints(hodRemarksData.additionalPoints);
+          }
+          if (typeof hodRemarksData?.additionalPointsRemark === "string") {
+            setHodAdditionalPointsRemark(hodRemarksData.additionalPointsRemark);
           }
           if (typeof hodRemarksData?.overallRemark === "string") {
             setHodOverallRemark(hodRemarksData.overallRemark);
@@ -692,11 +696,14 @@ function CommitteeReviewPage() {
             HOD Approved
           </p>
           <p className="mt-2 text-2xl font-bold text-text">
-            {appraisal.items.reduce(
-              (sum, item) => sum + item.hodApprovedPoints,
-              0,
-            )}
+            {appraisal.items.reduce((sum, item) => sum + item.hodApprovedPoints, 0) +
+              (!isHodAppraisal ? hodAdditionalPoints : 0)}
           </p>
+          {!isHodAppraisal && hodAdditionalPoints > 0 && (
+            <p className="mt-0.5 text-xs text-text-3">
+              incl. {hodAdditionalPoints} remarks score
+            </p>
+          )}
         </div>
         <div className="rounded-2xl border border-border bg-brand/10 p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-widest text-brand">
@@ -965,6 +972,9 @@ function CommitteeReviewPage() {
             <div className="rounded-lg bg-bg p-3">
               <p className="text-xs font-semibold uppercase tracking-widest text-text-3">HOD&apos;s Remarks Score</p>
               <p className="mt-1 text-lg font-bold text-text">{hodAdditionalPoints} / 4</p>
+              {hodAdditionalPointsRemark && (
+                <p className="mt-1 text-sm text-text-2">{hodAdditionalPointsRemark}</p>
+              )}
             </div>
             {hodOverallRemark && (
               <div className="rounded-lg bg-bg p-3">
