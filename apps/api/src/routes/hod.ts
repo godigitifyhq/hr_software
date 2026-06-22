@@ -231,19 +231,29 @@ router.get(
         orderBy: { submittedAt: "desc" },
       });
 
-      const payload = appraisals.map((appraisal) => ({
-        id: appraisal.id,
-        status: appraisal.status,
-        submittedAt: appraisal.submittedAt,
-        finalScore: appraisal.finalScore,
-        user: appraisal.user,
-        cycle: appraisal.cycle,
-        totalSelectedPoints: appraisal.items.reduce(
-          (sum, item) => sum + item.points,
-          0,
-        ),
-        itemsCount: appraisal.items.length,
-      }));
+      const payload = appraisals.map((appraisal) => {
+        let totalSelectedPoints = 0;
+        for (const item of appraisal.items) {
+          try {
+            const parsed = item.notes ? (JSON.parse(item.notes) as Record<string, unknown>) : null;
+            const hodReview = parsed?.hodReview as Record<string, unknown> | undefined;
+            const hodApproved = typeof hodReview?.approvedPoints === "number" ? hodReview.approvedPoints : null;
+            totalSelectedPoints += hodApproved ?? item.points;
+          } catch {
+            totalSelectedPoints += item.points;
+          }
+        }
+        return {
+          id: appraisal.id,
+          status: appraisal.status,
+          submittedAt: appraisal.submittedAt,
+          finalScore: appraisal.finalScore,
+          user: appraisal.user,
+          cycle: appraisal.cycle,
+          totalSelectedPoints,
+          itemsCount: appraisal.items.length,
+        };
+      });
 
       res.json({
         success: true,
@@ -792,19 +802,29 @@ router.get(
         orderBy: { submittedAt: "desc" },
       });
 
-      const payload = appraisals.map((appraisal) => ({
-        id: appraisal.id,
-        status: appraisal.status,
-        submittedAt: appraisal.submittedAt,
-        finalScore: appraisal.finalScore,
-        user: appraisal.user,
-        cycle: appraisal.cycle,
-        totalSelectedPoints: appraisal.items.reduce(
-          (sum, item) => sum + item.points,
-          0,
-        ),
-        itemsCount: appraisal.items.length,
-      }));
+      const payload = appraisals.map((appraisal) => {
+        let totalSelectedPoints = 0;
+        for (const item of appraisal.items) {
+          try {
+            const parsed = item.notes ? (JSON.parse(item.notes) as Record<string, unknown>) : null;
+            const hodReview = parsed?.hodReview as Record<string, unknown> | undefined;
+            const hodApproved = typeof hodReview?.approvedPoints === "number" ? hodReview.approvedPoints : null;
+            totalSelectedPoints += hodApproved ?? item.points;
+          } catch {
+            totalSelectedPoints += item.points;
+          }
+        }
+        return {
+          id: appraisal.id,
+          status: appraisal.status,
+          submittedAt: appraisal.submittedAt,
+          finalScore: appraisal.finalScore,
+          user: appraisal.user,
+          cycle: appraisal.cycle,
+          totalSelectedPoints,
+          itemsCount: appraisal.items.length,
+        };
+      });
 
       res.json({
         success: true,
