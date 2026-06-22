@@ -53,6 +53,7 @@ type CommitteeAppraisalDetail = {
   items: ReviewItem[];
   finalScore?: number | null;
   committeeNotes?: string | null;
+  hodRemarks?: string | null;
 };
 
 type CommitteeAppraisalDetailResponse = Omit<
@@ -65,6 +66,7 @@ type CommitteeAppraisalDetailResponse = Omit<
     points: number;
     notes?: string | null;
   }>;
+  hodRemarks?: string | null;
 };
 
 type ItemState = {
@@ -221,6 +223,14 @@ function buildItemPayload(
 
 const EDITABLE_STATUSES = ["HOD_REVIEW", "COMMITTEE_REVIEW"];
 
+const HOD_ONLY_KEYS = [
+  "fee_recovery",
+  "awards_outside_svgoi",
+  "overall_university_result",
+  "placement",
+  "department_university_positions",
+];
+
 function CommitteeReviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -247,6 +257,8 @@ function CommitteeReviewPage() {
   >({});
   const [remarksScore, setRemarksScore] = useState(0);
   const [remarksScoreRemark, setRemarksScoreRemark] = useState("");
+  const [hodAdditionalPoints, setHodAdditionalPoints] = useState(0);
+  const [hodOverallRemark, setHodOverallRemark] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -328,6 +340,20 @@ function CommitteeReviewPage() {
           // non-fatal
         }
 
+        try {
+          const hodRemarksData = payload.hodRemarks
+            ? (JSON.parse(payload.hodRemarks) as Record<string, unknown>)
+            : null;
+          if (typeof hodRemarksData?.additionalPoints === "number") {
+            setHodAdditionalPoints(hodRemarksData.additionalPoints);
+          }
+          if (typeof hodRemarksData?.overallRemark === "string") {
+            setHodOverallRemark(hodRemarksData.overallRemark);
+          }
+        } catch {
+          // non-fatal
+        }
+
         setAppraisal({
           id: payload.id,
           status: payload.status,
@@ -337,6 +363,7 @@ function CommitteeReviewPage() {
           items: nextItems,
           finalScore: payload.finalScore,
           committeeNotes: payload.committeeNotes,
+          hodRemarks: payload.hodRemarks,
         });
 
         setSavedSections({});
@@ -376,14 +403,18 @@ function CommitteeReviewPage() {
 
   const canEdit = EDITABLE_STATUSES.includes(appraisal?.status ?? "");
 
-  const totalApprovedPoints = useMemo(
-    () =>
-      Object.values(itemState).reduce(
-        (sum, item) => sum + Number(item.approvedPoints || 0),
-        0,
-      ) + remarksScore,
-    [itemState, remarksScore],
+  const isHodAppraisal = useMemo(
+    () => (appraisal?.items ?? []).some((item) => HOD_ONLY_KEYS.includes(item.criterionKey)),
+    [appraisal],
   );
+
+  const totalApprovedPoints = useMemo(() => {
+    const itemSum = Object.values(itemState).reduce(
+      (sum, item) => sum + Number(item.approvedPoints || 0),
+      0,
+    );
+    return itemSum + (isHodAppraisal ? remarksScore : hodAdditionalPoints);
+  }, [itemState, remarksScore, hodAdditionalPoints, isHodAppraisal]);
 
   const totalCommitteeApproved = useMemo(
     () =>
@@ -525,7 +556,7 @@ function CommitteeReviewPage() {
       return;
     }
 
-    if (remarksScore > 0 && !remarksScoreRemark.trim()) {
+    if (isHodAppraisal && remarksScore > 0 && !remarksScoreRemark.trim()) {
       setError("Remarks are required for HOD's Remarks Score.");
       return;
     }
@@ -537,8 +568,8 @@ function CommitteeReviewPage() {
       await api.committee.submitReview(appraisalId, {
         items: itemsPayload,
         finalize: true,
-        additionalPoints: remarksScore,
-        additionalPointsRemark: remarksScoreRemark.trim() || undefined,
+        additionalPoints: isHodAppraisal ? remarksScore : hodAdditionalPoints,
+        additionalPointsRemark: isHodAppraisal ? (remarksScoreRemark.trim() || undefined) : undefined,
       });
       setMessage("Committee review submitted successfully.");
       setTimeout(() => {
@@ -926,51 +957,74 @@ function CommitteeReviewPage() {
         </section>
       ) : null}
 
+      {/* HOD remarks info panel — faculty appraisals only */}
+      {!isHodAppraisal && (hodAdditionalPoints > 0 || hodOverallRemark) && (
+        <div className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-sm">
+          <h3 className="font-display text-base font-semibold text-text">HOD&apos;s Remarks</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg bg-bg p-3">
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-3">HOD&apos;s Remarks Score</p>
+              <p className="mt-1 text-lg font-bold text-text">{hodAdditionalPoints} / 4</p>
+            </div>
+            {hodOverallRemark && (
+              <div className="rounded-lg bg-bg p-3">
+                <p className="text-xs font-semibold uppercase tracking-widest text-text-3">Overall Remark</p>
+                <p className="mt-1 text-sm text-text-2">{hodOverallRemark}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       {canEdit ? (
         <section className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-sm">
-          <h3 className="font-display text-lg font-semibold text-text">
-            Final Committee Inputs
-          </h3>
-          <p className="mt-1 text-sm text-text-2">
-            Save each category section first, then fill the HOD&apos;s Remarks Score
-            and submit when everything is ready.
-          </p>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-text">
-                HOD&apos;s Remarks Score (1 to 4 Marks)
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={4}
-                value={remarksScore}
-                title="HOD's Remarks Score (1 to 4 Marks)"
-                onChange={(event) =>
-                  setRemarksScore(
-                    Math.max(0, Math.min(4, Number(event.target.value || 0))),
-                  )
-                }
-                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-text">
-                Remarks for HOD&apos;s Score{" "}
-                {remarksScore > 0 ? "(Required)" : "(Optional)"}
-              </label>
-              <input
-                value={remarksScoreRemark}
-                onChange={(event) => setRemarksScoreRemark(event.target.value)}
-                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
-                placeholder="Type Your Remarks here"
-              />
-            </div>
-          </div>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {isHodAppraisal ? (
+            <>
+              <h3 className="font-display text-lg font-semibold text-text">
+                Final Committee Inputs
+              </h3>
+              <p className="mt-1 text-sm text-text-2">
+                Save each category section first, then fill the HOD&apos;s Remarks Score
+                and submit when everything is ready.
+              </p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-text">
+                    HOD&apos;s Remarks Score (1 to 4 Marks)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={4}
+                    value={remarksScore}
+                    title="HOD's Remarks Score (1 to 4 Marks)"
+                    onChange={(event) =>
+                      setRemarksScore(
+                        Math.max(0, Math.min(4, Number(event.target.value || 0))),
+                      )
+                    }
+                    className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-text">
+                    Remarks for HOD&apos;s Score{" "}
+                    {remarksScore > 0 ? "(Required)" : "(Optional)"}
+                  </label>
+                  <input
+                    value={remarksScoreRemark}
+                    onChange={(event) => setRemarksScoreRemark(event.target.value)}
+                    className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
+                    placeholder="Type Your Remarks here"
+                  />
+                </div>
+              </div>
+            </>
+          ) : null}
+          <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${isHodAppraisal ? "mt-5" : ""}`}>
             <p className="text-sm text-text-2">
-              Total approved points (including HOD&apos;s Remarks):{" "}
+              Total approved points{isHodAppraisal ? " (including HOD’s Remarks)" : ""}:{" "}
               {totalApprovedPoints}
             </p>
             <button
@@ -1001,9 +1055,14 @@ function CommitteeReviewPage() {
                 <span className="font-bold text-brand">
                   {totalCommitteeApproved}
                 </span>
-                {remarksScore > 0 && (
+                {isHodAppraisal && remarksScore > 0 && (
                   <span className="ml-2 text-xs text-text-3">
                     (includes HOD&apos;s Remarks Score: {remarksScore})
+                  </span>
+                )}
+                {!isHodAppraisal && hodAdditionalPoints > 0 && (
+                  <span className="ml-2 text-xs text-text-3">
+                    (includes HOD&apos;s Remarks Score: {hodAdditionalPoints})
                   </span>
                 )}
               </p>
