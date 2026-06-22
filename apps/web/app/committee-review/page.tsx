@@ -28,13 +28,14 @@ interface AppraisalForReview {
   itemsCount: number;
 }
 
-const ACTIVE_STATUSES = ["HOD_REVIEW", "COMMITTEE_REVIEW"];
+const ACTIVE_STATUSES = ["COMMITTEE_REVIEW"];
 
 function getStatusBadge(status: string) {
   const map: Record<string, { bg: string; text: string; label: string; icon: React.ReactNode }> = {
     COMMITTEE_REVIEW: { bg: "bg-blue-100", text: "text-blue-800", label: "Pending Review", icon: <AlertCircle className="h-3.5 w-3.5" /> },
     HOD_REVIEW: { bg: "bg-yellow-100", text: "text-yellow-800", label: "HOD Review", icon: <AlertCircle className="h-3.5 w-3.5" /> },
     HR_FINALIZED: { bg: "bg-green-100", text: "text-green-800", label: "Submitted to HR", icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+    ADMIN_REVIEW: { bg: "bg-orange-100", text: "text-orange-800", label: "Pending Admin", icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
     FULLY_APPROVED: { bg: "bg-emerald-100", text: "text-emerald-800", label: "Fully Approved", icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
   };
   const badge = map[status] ?? map.COMMITTEE_REVIEW;

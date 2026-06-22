@@ -612,7 +612,7 @@ router.put(
         prisma.appraisal.update({
           where: { id: appraisalId },
           data: {
-            status: "ADMIN_REVIEW",
+            status: "COMMITTEE_REVIEW",
             locked: true,
             finalScore: totalApproved,
             finalPercent: incrementPercent,
@@ -641,7 +641,7 @@ router.put(
           appraisalId,
           totalApprovedPoints: totalApproved,
           incrementPercent,
-          forwardedStatus: "ADMIN_REVIEW",
+          forwardedStatus: "COMMITTEE_REVIEW",
         },
       });
     } catch (error) {
@@ -763,7 +763,7 @@ router.get(
       const appraisals = await prisma.appraisal.findMany({
         where: {
           ...(committeeCycleId ? { cycleId: committeeCycleId } : {}),
-          status: { in: ["COMMITTEE_REVIEW", "HR_FINALIZED"] },
+          status: { in: ["COMMITTEE_REVIEW", "HR_FINALIZED", "ADMIN_REVIEW", "FULLY_APPROVED"] },
           committeeAssignments: {
             some: {
               committee: { members: { some: { id: committeeId } } },
@@ -974,7 +974,7 @@ router.put(
           await transaction.appraisal.update({
             where: { id: appraisalId },
             data: {
-              status: "FULLY_APPROVED",
+              status: "HR_FINALIZED",
               finalScore: totalApproved,
               committeeNotes: JSON.stringify({
                 overallRemark: parsed.overallRemark?.trim() || null,
@@ -1010,7 +1010,7 @@ router.put(
         data: {
           appraisalId,
           totalApprovedPoints: totalApproved,
-          forwardedStatus: isFinalSubmit ? "FULLY_APPROVED" : "COMMITTEE_REVIEW",
+          forwardedStatus: isFinalSubmit ? "HR_FINALIZED" : "COMMITTEE_REVIEW",
         },
       });
     } catch (error) {

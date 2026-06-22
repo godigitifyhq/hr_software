@@ -20,6 +20,14 @@ function getStatusBadge(status: string) {
       </span>
     );
   }
+  if (status === "ADMIN_REVIEW") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        Submitted to Admin
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
       <Clock className="h-3.5 w-3.5" />
@@ -82,7 +90,7 @@ function HRReviewListPage() {
   }, [appraisals, search, deptFilter, cycleFilter]);
 
   const pending = useMemo(() => filtered.filter((a) => a.status === "HR_FINALIZED"), [filtered]);
-  const approved = useMemo(() => filtered.filter((a) => a.status === "FULLY_APPROVED"), [filtered]);
+  const approved = useMemo(() => filtered.filter((a) => a.status !== "HR_FINALIZED"), [filtered]);
 
   function AppraisalRow({ appraisal, viewOnly }: { appraisal: any; viewOnly: boolean }) {
     return (

@@ -60,7 +60,7 @@ router.get(
       const appraisals = await prisma.appraisal.findMany({
         where: {
           ...(effectiveCycleId ? { cycleId: effectiveCycleId } : {}),
-          status: { in: ["ADMIN_REVIEW", "HR_FINALIZED", "COMMITTEE_REVIEW", "FULLY_APPROVED", "REJECTED"] },
+          status: { in: ["ADMIN_REVIEW", "FULLY_APPROVED", "REJECTED"] },
         },
         include: {
           cycle: {
@@ -296,7 +296,7 @@ router.put(
         await transaction.appraisal.update({
           where: { id: appraisalId },
           data: {
-            status: "HR_FINALIZED",
+            status: "FULLY_APPROVED",
             finalScore: totalApproved,
             adminRemark: JSON.stringify({
               overallRemark: parsed.overallRemark?.trim() || null,
