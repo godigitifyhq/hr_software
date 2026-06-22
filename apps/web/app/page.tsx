@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -46,6 +47,13 @@ export default function Home() {
     <div className="min-h-screen bg-bg text-text">
       <section className="mx-auto flex min-h-screen max-w-[1440px] flex-col justify-center gap-12 px-6 py-10 lg:grid lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:px-10">
         <div className="space-y-8">
+          <Image
+            src="/Logo.png"
+            alt="SVGOI Logo"
+            width={160}
+            height={70}
+            className="object-contain"
+          />
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-2 shadow-xs">
             <Sparkles className="h-3.5 w-3.5 text-brand" />
             SVGOI Appraisal Management System

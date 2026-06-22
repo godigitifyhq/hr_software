@@ -52,7 +52,6 @@ const CRITERION_ORDER = [
   "co_curricular_activities",
   "attendance",
   "awards_recognition",
-  "hod_remarks_score",
   // HOD-only criteria (XIV–XVIII)
   "fee_recovery",
   "awards_outside_svgoi",
@@ -479,14 +478,14 @@ function HodReviewDetailPage() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-text">
-                  Additional points (0 to 4)
+                  HOD's Remarks Score (1 to 4 Marks)
                 </label>
                 <input
                   type="number"
                   min={0}
                   max={4}
                   value={additionalPoints}
-                  title="Additional points (0 to 4)"
+                  title="HOD's Remarks Score (1 to 4 Marks)"
                   onChange={(event) =>
                     setAdditionalPoints(
                       Math.max(0, Math.min(4, Number(event.target.value || 0))),
@@ -497,7 +496,7 @@ function HodReviewDetailPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-text">
-                  Additional points remark{" "}
+                  Remarks for HOD's Score{" "}
                   {additionalPoints > 0 ? "(Required)" : "(Optional)"}
                 </label>
                 <input
@@ -506,7 +505,7 @@ function HodReviewDetailPage() {
                     setAdditionalPointsRemark(event.target.value)
                   }
                   className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
-                  placeholder="Reason for granting additional points"
+                  placeholder="Type Your Remarks here"
                 />
               </div>
               <div className="md:col-span-2">

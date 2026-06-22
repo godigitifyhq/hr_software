@@ -458,6 +458,8 @@ export const api = {
         }>;
         overallRemark?: string;
         finalize?: boolean;
+        additionalPoints?: number;
+        additionalPointsRemark?: string;
       },
     ) =>
       unwrap<AppraisalSummary>(

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -92,7 +93,7 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-[45%_55%]">
       <aside className="hidden flex-col justify-between bg-[#0F172A] px-10 py-8 text-white lg:flex">
-        <div className="font-display text-xl font-semibold">SVGOI</div>
+        <div />
 
         <div className="max-w-xl space-y-8">
           <div className="space-y-4">
@@ -132,6 +133,13 @@ export default function LoginPage() {
       <main className="flex items-center justify-center px-6 py-12 lg:px-10">
         <div className="w-full max-w-[360px] space-y-8">
           <div>
+            <Image
+              src="/Logo.png"
+              alt="SVGOI Logo"
+              width={120}
+              height={50}
+              className="mb-6 object-contain"
+            />
             <h1 className="font-display text-[26px] font-semibold tracking-tight text-text">
               Welcome back
             </h1>

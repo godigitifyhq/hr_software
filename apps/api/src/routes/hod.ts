@@ -727,6 +727,8 @@ const committeeReviewSchema = z.object({
     .min(1),
   overallRemark: z.string().optional(),
   finalize: z.boolean().optional(),
+  additionalPoints: z.number().int().min(0).max(4).optional().default(0),
+  additionalPointsRemark: z.string().optional(),
 });
 
 router.get(
@@ -936,10 +938,9 @@ router.put(
         }
       }
 
-      const totalApproved = parsed.items.reduce(
-        (sum, item) => sum + item.approvedPoints,
-        0,
-      );
+      const totalApproved =
+        parsed.items.reduce((sum, item) => sum + item.approvedPoints, 0) +
+        (parsed.additionalPoints ?? 0);
 
       await prisma.$transaction(async (transaction) => {
         for (const reviewed of parsed.items) {
@@ -976,6 +977,8 @@ router.put(
               finalScore: totalApproved,
               committeeNotes: JSON.stringify({
                 overallRemark: parsed.overallRemark?.trim() || null,
+                additionalPoints: parsed.additionalPoints ?? 0,
+                additionalPointsRemark: parsed.additionalPointsRemark?.trim() || null,
                 reviewedBy: committeeId,
                 reviewedAt: new Date().toISOString(),
               }),

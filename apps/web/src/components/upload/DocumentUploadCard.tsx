@@ -215,14 +215,8 @@ export function DocumentUploadCard({
               {config.label}
             </h3>
             {config.required ? (
-              <span className="rounded-full border border-danger/20 bg-danger-bg px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-danger">
-                Required
-              </span>
-            ) : (
-              <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-text-2">
-                Optional
-              </span>
-            )}
+              <span className="text-danger">*</span>
+            ) : null}
           </div>
           <p className="mt-1 text-sm leading-relaxed text-text-2">
             {config.helperText}

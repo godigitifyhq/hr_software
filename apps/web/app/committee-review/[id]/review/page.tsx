@@ -118,7 +118,6 @@ const CATEGORY_BY_KEY: Record<string, ReviewCategory> = {
   co_curricular_activities: "Others",
   attendance: "Others",
   awards_recognition: "Others",
-  hod_remarks_score: "Others",
   fee_recovery: "Others",
   awards_outside_svgoi: "Others",
 };
@@ -136,7 +135,6 @@ const CRITERION_ORDER = [
   "co_curricular_activities",
   "attendance",
   "awards_recognition",
-  "hod_remarks_score",
   "fee_recovery",
   "awards_outside_svgoi",
   "overall_university_result",
@@ -247,6 +245,8 @@ function CommitteeReviewPage() {
   const [savedSections, setSavedSections] = useState<
     Partial<Record<ReviewCategory, boolean>>
   >({});
+  const [remarksScore, setRemarksScore] = useState(0);
+  const [remarksScoreRemark, setRemarksScoreRemark] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -314,6 +314,20 @@ function CommitteeReviewPage() {
           return;
         }
 
+        try {
+          const savedNotes = payload.committeeNotes
+            ? (JSON.parse(payload.committeeNotes) as Record<string, unknown>)
+            : null;
+          if (typeof savedNotes?.additionalPoints === "number") {
+            setRemarksScore(savedNotes.additionalPoints);
+          }
+          if (typeof savedNotes?.additionalPointsRemark === "string") {
+            setRemarksScoreRemark(savedNotes.additionalPointsRemark);
+          }
+        } catch {
+          // non-fatal
+        }
+
         setAppraisal({
           id: payload.id,
           status: payload.status,
@@ -367,8 +381,8 @@ function CommitteeReviewPage() {
       Object.values(itemState).reduce(
         (sum, item) => sum + Number(item.approvedPoints || 0),
         0,
-      ),
-    [itemState],
+      ) + remarksScore,
+    [itemState, remarksScore],
   );
 
   const totalCommitteeApproved = useMemo(
@@ -511,6 +525,11 @@ function CommitteeReviewPage() {
       return;
     }
 
+    if (remarksScore > 0 && !remarksScoreRemark.trim()) {
+      setError("Remarks are required for HOD's Remarks Score.");
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -518,6 +537,8 @@ function CommitteeReviewPage() {
       await api.committee.submitReview(appraisalId, {
         items: itemsPayload,
         finalize: true,
+        additionalPoints: remarksScore,
+        additionalPointsRemark: remarksScoreRemark.trim() || undefined,
       });
       setMessage("Committee review submitted successfully.");
       setTimeout(() => {
@@ -909,15 +930,48 @@ function CommitteeReviewPage() {
       {canEdit ? (
         <section className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-sm">
           <h3 className="font-display text-lg font-semibold text-text">
-            Final Committee Submission
+            Final Committee Inputs
           </h3>
           <p className="mt-1 text-sm text-text-2">
-            Save each category section first, then submit the complete committee
-            review when everything is ready.
+            Save each category section first, then fill the HOD's Remarks Score
+            and submit when everything is ready.
           </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-text">
+                HOD's Remarks Score (1 to 4 Marks)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={4}
+                value={remarksScore}
+                title="HOD's Remarks Score (1 to 4 Marks)"
+                onChange={(event) =>
+                  setRemarksScore(
+                    Math.max(0, Math.min(4, Number(event.target.value || 0))),
+                  )
+                }
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-text">
+                Remarks for HOD's Score{" "}
+                {remarksScore > 0 ? "(Required)" : "(Optional)"}
+              </label>
+              <input
+                value={remarksScoreRemark}
+                onChange={(event) => setRemarksScoreRemark(event.target.value)}
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text"
+                placeholder="Type Your Remarks here"
+              />
+            </div>
+          </div>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-text-2">
-              Total approved points: {totalApprovedPoints}
+              Total approved points (including HOD's Remarks):{" "}
+              {totalApprovedPoints}
             </p>
             <button
               type="button"
@@ -947,6 +1001,11 @@ function CommitteeReviewPage() {
                 <span className="font-bold text-brand">
                   {totalCommitteeApproved}
                 </span>
+                {remarksScore > 0 && (
+                  <span className="ml-2 text-xs text-text-3">
+                    (includes HOD&apos;s Remarks Score: {remarksScore})
+                  </span>
+                )}
               </p>
             </div>
           </div>

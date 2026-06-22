@@ -83,7 +83,7 @@ const baseCriteria: PolicyCriterion[] = [
   },
   {
     key: "research_publications",
-    heading: "II. Papers Published / Accepted (Scopus / SCI / ABDC / WOS / IEEE)",
+    heading: "II. Papers Published / Accepted (Scopus / SCI / ABDC / WOS / IEEE / PubMed)",
     category: "Research",
     options: [
       { value: "paper_1", label: "Paper 1", points: 1 },
@@ -284,17 +284,6 @@ const baseCriteria: PolicyCriterion[] = [
       },
     ],
   },
-  {
-    key: "hod_remarks_score",
-    heading: "XIII. HOD's Remarks (1 to 4 Marks)",
-    category: "Others",
-    options: [
-      { value: "hod_1", label: "1 Mark", points: 1 },
-      { value: "hod_2", label: "2 Marks", points: 2 },
-      { value: "hod_3", label: "3 Marks", points: 3 },
-      { value: "hod_4", label: "4 Marks", points: 4 },
-    ],
-  },
 ];
 
 const hodOnlyCriteria: PolicyCriterion[] = [
@@ -383,7 +372,7 @@ const hodOnlyCriteria: PolicyCriterion[] = [
 
 const facultyPolicy: AppraisalPolicy = {
   criteria: [...baseCriteria],
-  maxPoints: 52,
+  maxPoints: 48,
   incrementBrackets: [
     { min: 0, max: 16, incrementPercent: 5 },
     { min: 17, max: 23, incrementPercent: 8 },
@@ -394,7 +383,7 @@ const facultyPolicy: AppraisalPolicy = {
 
 const hodPolicy: AppraisalPolicy = {
   criteria: [...baseCriteria, ...hodOnlyCriteria],
-  maxPoints: 72,
+  maxPoints: 68,
   incrementBrackets: [
     { min: 0, max: 20, incrementPercent: 5 },
     { min: 21, max: 34, incrementPercent: 8 },
