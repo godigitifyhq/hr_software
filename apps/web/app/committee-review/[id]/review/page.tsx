@@ -933,13 +933,13 @@ function CommitteeReviewPage() {
             Final Committee Inputs
           </h3>
           <p className="mt-1 text-sm text-text-2">
-            Save each category section first, then fill the HOD's Remarks Score
+            Save each category section first, then fill the HOD&apos;s Remarks Score
             and submit when everything is ready.
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-text">
-                HOD's Remarks Score (1 to 4 Marks)
+                HOD&apos;s Remarks Score (1 to 4 Marks)
               </label>
               <input
                 type="number"
@@ -957,7 +957,7 @@ function CommitteeReviewPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-text">
-                Remarks for HOD's Score{" "}
+                Remarks for HOD&apos;s Score{" "}
                 {remarksScore > 0 ? "(Required)" : "(Optional)"}
               </label>
               <input
@@ -970,7 +970,7 @@ function CommitteeReviewPage() {
           </div>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-text-2">
-              Total approved points (including HOD's Remarks):{" "}
+              Total approved points (including HOD&apos;s Remarks):{" "}
               {totalApprovedPoints}
             </p>
             <button

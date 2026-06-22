@@ -478,7 +478,7 @@ function HodReviewDetailPage() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-text">
-                  HOD's Remarks Score (1 to 4 Marks)
+                  HOD&apos;s Remarks Score (1 to 4 Marks)
                 </label>
                 <input
                   type="number"
@@ -496,7 +496,7 @@ function HodReviewDetailPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-text">
-                  Remarks for HOD's Score{" "}
+                  Remarks for HOD&apos;s Score{" "}
                   {additionalPoints > 0 ? "(Required)" : "(Optional)"}
                 </label>
                 <input
