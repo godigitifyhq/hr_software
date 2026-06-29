@@ -118,15 +118,6 @@ function HodSelfRequestPage() {
     [criteriaState],
   );
 
-  const canSubmit = useMemo(() => {
-    if (!policy) {
-      return false;
-    }
-
-    return policy.criteria.every(
-      (criterion) => criteriaState[criterion.key]?.selectedValue,
-    );
-  }, [criteriaState, policy]);
 
   const incrementPercent = useMemo(() => {
     if (!policy) {
@@ -238,7 +229,7 @@ function HodSelfRequestPage() {
   }
 
   async function submitRequest() {
-    if (!policy || !canSubmit) {
+    if (!policy) {
       return;
     }
 
@@ -543,7 +534,7 @@ function HodSelfRequestPage() {
               <button
                 type="button"
                 onClick={() => void submitRequest()}
-                disabled={!canSubmit || submitting}
+                disabled={submitting}
                 className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? (

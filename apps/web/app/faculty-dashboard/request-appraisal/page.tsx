@@ -241,12 +241,6 @@ function FacultyAppraisalRequestPage() {
     [criteriaState],
   );
 
-  const canSubmit = useMemo(() => {
-    if (!policy) return false;
-    return policy.criteria.every(
-      (criterion) => criteriaState[criterion.key]?.selectedValue,
-    );
-  }, [criteriaState, policy]);
 
   const incrementPercent = useMemo(() => {
     if (!policy) return 0;
@@ -352,7 +346,7 @@ function FacultyAppraisalRequestPage() {
   }
 
   async function submitRequest() {
-    if (!policy || !canSubmit) return;
+    if (!policy) return;
 
     try {
       setSubmitting(true);
