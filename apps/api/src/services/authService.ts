@@ -75,7 +75,7 @@ function getRefreshExpiry() {
 
 async function loadUserByEmail(email: string) {
   return prisma.user.findUnique({
-    where: { email },
+    where: { email: email.toLowerCase() },
     include: {
       roles: true,
       department: {
@@ -98,8 +98,9 @@ async function loadUserById(userId: string) {
 }
 
 export async function registerUser(input: RegisterInput & { mustChangePassword?: boolean }) {
+  const normalizedEmail = input.email.toLowerCase();
   const existing = await prisma.user.findUnique({
-    where: { email: input.email },
+    where: { email: normalizedEmail },
   });
   if (existing) {
     throw new Error("Email already registered");
@@ -108,7 +109,7 @@ export async function registerUser(input: RegisterInput & { mustChangePassword?:
   const passwordHash = await bcrypt.hash(input.password, 12);
   const user = await prisma.user.create({
     data: {
-      email: input.email,
+      email: normalizedEmail,
       passwordHash,
       firstName: input.firstName,
       lastName: input.lastName,
