@@ -1256,14 +1256,6 @@ router.post(
         selectedByKey.set(entry.criterionKey, entry);
       });
 
-      if (selectedByKey.size !== policy.criteria.length) {
-        res.status(400).json({
-          success: false,
-          message: "Please select one option for each criterion",
-        });
-        return;
-      }
-
       const cycle = await getActiveCycleOrThrow();
       const existingAppraisal = await prisma.appraisal.findFirst({
         where: { userId, cycleId: cycle.id },
@@ -1279,29 +1271,23 @@ router.post(
 
       const appraisalItems = policy.criteria.map((criterion) => {
         const selected = selectedByKey.get(criterion.key);
-        if (!selected) {
-          throw new Error(`Missing selection for ${criterion.key}`);
-        }
-
         const criterionFromMap = criteriaByKey.get(criterion.key);
-        const option = criterionFromMap?.options.find(
-          (entry) => entry.value === selected.selectedValue,
-        );
-
-        if (!option) {
-          throw new Error(`Invalid option for ${criterion.heading}`);
-        }
+        const option = selected
+          ? criterionFromMap?.options.find(
+              (entry) => entry.value === selected.selectedValue,
+            )
+          : undefined;
 
         return {
           key: criterion.key,
-          points: option.points,
+          points: option?.points ?? 0,
           weight: 1,
           notes: JSON.stringify({
             heading: criterion.heading,
-            selectedValue: option.value,
-            selectedLabel: option.label,
-            evidence: selected.evidence ?? null,
-            facultyRemarks: selected.remarks?.trim() || null,
+            selectedValue: option?.value ?? null,
+            selectedLabel: option?.label ?? null,
+            evidence: selected?.evidence ?? null,
+            facultyRemarks: selected?.remarks?.trim() || null,
           }),
         };
       });

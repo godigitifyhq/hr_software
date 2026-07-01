@@ -351,12 +351,14 @@ function FacultyAppraisalRequestPage() {
     try {
       setSubmitting(true);
 
-      const items = policy.criteria.map((criterion) => ({
-        criterionKey: criterion.key,
-        selectedValue: criteriaState[criterion.key].selectedValue,
-        evidence: criteriaState[criterion.key].evidence,
-        remarks: criteriaState[criterion.key].remarks?.trim() || null,
-      }));
+      const items = policy.criteria
+        .map((criterion) => ({
+          criterionKey: criterion.key,
+          selectedValue: criteriaState[criterion.key].selectedValue,
+          evidence: criteriaState[criterion.key].evidence,
+          remarks: criteriaState[criterion.key].remarks?.trim() || null,
+        }))
+        .filter((item) => item.selectedValue !== "");
 
       await api.faculty.submitAppraisalRequest({ items });
       toast({

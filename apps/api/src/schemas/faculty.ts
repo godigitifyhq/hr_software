@@ -35,14 +35,12 @@ export const facultyAppraisalEvidenceSchema = z.object({
 });
 
 export const facultyAppraisalRequestSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        criterionKey: z.string().min(1),
-        selectedValue: z.string().min(1),
-        evidence: z.array(facultyAppraisalEvidenceSchema).optional().nullable(),
-        remarks: z.string().trim().optional().nullable(),
-      }),
-    )
-    .min(1),
+  items: z.array(
+    z.object({
+      criterionKey: z.string().min(1),
+      selectedValue: z.string().min(1),
+      evidence: z.array(facultyAppraisalEvidenceSchema).optional().nullable(),
+      remarks: z.string().trim().optional().nullable(),
+    }),
+  ),
 });
