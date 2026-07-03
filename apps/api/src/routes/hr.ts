@@ -1,6 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import {
   authenticateRequest,
   AuthenticatedRequest,
@@ -463,31 +464,38 @@ router.put(
       const totalApproved = itemApproved + hodAdditionalPoints;
       const incrementPercent = facultyIncrement(totalApproved);
 
-      for (const reviewed of parsed.items) {
-        const existing = byId.get(reviewed.itemId);
-        if (!existing) continue;
+      // Single batched statement instead of one UPDATE per item.
+      const hrReviewedAt = new Date().toISOString();
+      const hrItemUpdateRows = parsed.items
+        .map((reviewed) => {
+          const existing = byId.get(reviewed.itemId);
+          if (!existing) return null;
 
-        const baseNotes = parseItemNotes(existing.notes);
-        const nextNotes = {
-          ...baseNotes,
-          hrReview: {
-            approvedPoints: reviewed.approvedPoints,
-            remark: reviewed.remark?.trim() || null,
-            reviewedBy: actorId,
-            reviewedAt: new Date().toISOString(),
-          },
-        } as Record<string, unknown>;
+          const baseNotes = parseItemNotes(existing.notes);
+          const nextNotes = {
+            ...baseNotes,
+            hrReview: {
+              approvedPoints: reviewed.approvedPoints,
+              remark: reviewed.remark?.trim() || null,
+              reviewedBy: actorId,
+              reviewedAt: hrReviewedAt,
+            },
+          } as Record<string, unknown>;
 
-        await prisma.appraisalItem.update({
-          where: { id: reviewed.itemId },
-          data: {
-            points: reviewed.approvedPoints,
-            notes: JSON.stringify(nextNotes),
-          },
-        });
+          return Prisma.sql`(${reviewed.itemId}::text, ${reviewed.approvedPoints}::int, ${JSON.stringify(nextNotes)}::text)`;
+        })
+        .filter((row): row is Prisma.Sql => row !== null);
+
+      if (hrItemUpdateRows.length > 0) {
+        await prisma.$executeRaw`
+          UPDATE "AppraisalItem" AS ai
+          SET points = v.points, notes = v.notes
+          FROM (VALUES ${Prisma.join(hrItemUpdateRows)}) AS v(id, points, notes)
+          WHERE ai.id = v.id
+        `;
       }
 
-      await prisma.$transaction([
+      await Promise.all([
         prisma.appraisal.update({
           where: { id: appraisalId },
           data: {
@@ -496,15 +504,14 @@ router.put(
             finalPercent: incrementPercent,
           },
         }),
+        writeAuditLog({
+          actorId,
+          action: "appraisal.hr.review.completed",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: { itemApproved, hodAdditionalPoints, totalApproved, incrementPercent },
+        }),
       ]);
-
-      await writeAuditLog({
-        actorId,
-        action: "appraisal.hr.review.completed",
-        resource: "Appraisal",
-        resourceId: appraisalId,
-        meta: { itemApproved, hodAdditionalPoints, totalApproved, incrementPercent },
-      });
 
       res.json({
         success: true,
@@ -552,18 +559,19 @@ router.put(
         return;
       }
 
-      await prisma.appraisal.update({
-        where: { id: appraisalId },
-        data: { status: "REJECTED", rejectedAt: new Date(), rejectedBy: actorId, rejectionReason: reason.trim() },
-      });
-
-      await writeAuditLog({
-        actorId,
-        action: "appraisal.hr.rejected",
-        resource: "Appraisal",
-        resourceId: appraisalId,
-        meta: { reason },
-      });
+      await Promise.all([
+        prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: { status: "REJECTED", rejectedAt: new Date(), rejectedBy: actorId, rejectionReason: reason.trim() },
+        }),
+        writeAuditLog({
+          actorId,
+          action: "appraisal.hr.rejected",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: { reason },
+        }),
+      ]);
 
       res.json({ success: true, message: "Appraisal rejected", data: { appraisalId, status: "REJECTED" } });
     } catch (error) {
@@ -675,20 +683,23 @@ router.post(
         mustChangePassword: true,
       } as any);
 
-      // assign roles if present
-      if (input.roles && input.roles.length > 0) {
-        await prisma.userRole.createMany({
-          data: input.roles.map((r) => ({ userId: user.id, role: r as any })),
-        });
-      }
-
-      await writeAuditLog({
-        actorId: req.auth?.sub || "",
-        action: "hr.user.created",
-        resource: "User",
-        resourceId: user.id,
-        meta: { email: user.email },
-      });
+      // assign roles if present (independent of the audit write, so run concurrently)
+      const rolesToAssign =
+        input.roles && input.roles.length > 0 ? input.roles : null;
+      await Promise.all([
+        rolesToAssign
+          ? prisma.userRole.createMany({
+              data: rolesToAssign.map((r) => ({ userId: user.id, role: r as any })),
+            })
+          : Promise.resolve(),
+        writeAuditLog({
+          actorId: req.auth?.sub || "",
+          action: "hr.user.created",
+          resource: "User",
+          resourceId: user.id,
+          meta: { email: user.email },
+        }),
+      ]);
 
       res.status(201).json({
         success: true,
@@ -783,18 +794,19 @@ router.put(
       }
 
       const newHash = await bcrypt.hash(newPassword, 12);
-      await prisma.user.update({
-        where: { id: userId },
-        data: { passwordHash: newHash, passwordChangedAt: new Date(), mustChangePassword: true },
-      });
-
-      await writeAuditLog({
-        actorId: req.auth?.sub || "",
-        action: "hr.user.password_changed",
-        resource: "User",
-        resourceId: userId,
-        meta: { targetEmail: target.email },
-      });
+      await Promise.all([
+        prisma.user.update({
+          where: { id: userId },
+          data: { passwordHash: newHash, passwordChangedAt: new Date(), mustChangePassword: true },
+        }),
+        writeAuditLog({
+          actorId: req.auth?.sub || "",
+          action: "hr.user.password_changed",
+          resource: "User",
+          resourceId: userId,
+          meta: { targetEmail: target.email },
+        }),
+      ]);
 
       res.json({ success: true, message: "Password changed successfully" });
     } catch (error) {
@@ -819,18 +831,19 @@ router.put(
         ? new Date(until)
         : new Date(Date.now() + 1000 * 60 * 60 * 24 * 365);
 
-      await prisma.user.update({
-        where: { id: userId },
-        data: { lockedUntil },
-      });
-
-      await writeAuditLog({
-        actorId: req.auth?.sub || "",
-        action: "hr.user.blocked",
-        resource: "User",
-        resourceId: userId,
-        meta: { until: lockedUntil.toISOString() },
-      });
+      await Promise.all([
+        prisma.user.update({
+          where: { id: userId },
+          data: { lockedUntil },
+        }),
+        writeAuditLog({
+          actorId: req.auth?.sub || "",
+          action: "hr.user.blocked",
+          resource: "User",
+          resourceId: userId,
+          meta: { until: lockedUntil.toISOString() },
+        }),
+      ]);
 
       res.json({
         success: true,
@@ -850,17 +863,18 @@ router.put(
   async (req: AuthenticatedRequest, res, next) => {
     try {
       const { userId } = req.params;
-      await prisma.user.update({
-        where: { id: userId },
-        data: { lockedUntil: null, failedLoginCount: 0 },
-      });
-
-      await writeAuditLog({
-        actorId: req.auth?.sub || "",
-        action: "hr.user.unblocked",
-        resource: "User",
-        resourceId: userId,
-      });
+      await Promise.all([
+        prisma.user.update({
+          where: { id: userId },
+          data: { lockedUntil: null, failedLoginCount: 0 },
+        }),
+        writeAuditLog({
+          actorId: req.auth?.sub || "",
+          action: "hr.user.unblocked",
+          resource: "User",
+          resourceId: userId,
+        }),
+      ]);
 
       res.json({ success: true, message: "User unblocked", data: { userId } });
     } catch (error) {
@@ -976,19 +990,20 @@ router.post(
           lastName: input.hod.lastName,
         });
 
-        await prisma.userRole.create({
-          data: { userId: newHod.id, role: "HOD" },
-        });
-
         resolvedHodId = newHod.id;
 
-        await writeAuditLog({
-          actorId: req.auth?.sub || "",
-          action: "hr.hod.created",
-          resource: "User",
-          resourceId: newHod.id,
-          meta: { email: input.hod.email, department: input.name },
-        });
+        await Promise.all([
+          prisma.userRole.create({
+            data: { userId: newHod.id, role: "HOD" },
+          }),
+          writeAuditLog({
+            actorId: req.auth?.sub || "",
+            action: "hr.hod.created",
+            resource: "User",
+            resourceId: newHod.id,
+            meta: { email: input.hod.email, department: input.name },
+          }),
+        ]);
       }
 
       const department = await prisma.department.create({

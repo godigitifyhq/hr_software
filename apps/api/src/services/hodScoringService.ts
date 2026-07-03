@@ -336,15 +336,26 @@ function calculateMemoDeduction(memoIssues: number | undefined, policy: HODScori
     return { deductionPoints: 0, noIncrement: policy.memoDeductions.moreThanFiveNoIncrement, note: 'More than 5 memo issues' };
 }
 
+// There is no route anywhere in the app that updates ScoringConfig at runtime
+// (it's seed-data only), so the resolved policy can be cached for the life of
+// the process without any staleness risk — this avoids a DB round trip on
+// every single scoring preview/persist call.
+let cachedPolicy: HODScoringPolicy | null = null;
+
 async function loadPolicy(): Promise<HODScoringPolicy> {
+    if (cachedPolicy) {
+        return cachedPolicy;
+    }
+
     const stored = await prisma.scoringConfig.findUnique({ where: { key: 'hod-default' } });
     if (!stored) {
-        return defaultPolicy;
+        cachedPolicy = defaultPolicy;
+        return cachedPolicy;
     }
 
     try {
         const parsed = JSON.parse(stored.schemaJson) as Partial<HODScoringPolicy>;
-        return {
+        cachedPolicy = {
             ...defaultPolicy,
             ...parsed,
             brackets: { ...defaultPolicy.brackets, ...(parsed.brackets || {}) },
@@ -352,8 +363,10 @@ async function loadPolicy(): Promise<HODScoringPolicy> {
             memoDeductions: { ...defaultPolicy.memoDeductions, ...(parsed.memoDeductions || {}) }
         };
     } catch {
-        return defaultPolicy;
+        cachedPolicy = defaultPolicy;
     }
+
+    return cachedPolicy;
 }
 
 export async function calculateHodScore(input: HodgeMetrics): Promise<HodScoreResult> {
@@ -399,13 +412,11 @@ export async function persistHodScore(input: {
     actorId: string;
     remarks?: string;
     metrics: HodgeMetrics;
+    // Caller already fetches the appraisal (existence + locked state) before
+    // calling this, so it's passed in here instead of being re-queried.
+    locked: boolean;
 }) {
-    const appraisal = await prisma.appraisal.findUnique({ where: { id: input.appraisalId } });
-    if (!appraisal) {
-        throw new Error('Appraisal not found');
-    }
-
-    if (appraisal.locked) {
+    if (input.locked) {
         throw new Error('Appraisal is locked');
     }
 

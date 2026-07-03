@@ -93,18 +93,13 @@ router.get(
   requireRoles("SUPER_ADMIN"),
   async (_req: AuthenticatedRequest, res, next) => {
     try {
-      const totalUsers = await prisma.user.count();
-      const totalAppraisals = await prisma.appraisal.count();
-
-      const appraisalsByStatus = await prisma.appraisal.groupBy({
-        by: ["status"],
-        _count: true,
-      });
-
-      const roleDistribution = await prisma.userRole.groupBy({
-        by: ["role"],
-        _count: true,
-      });
+      const [totalUsers, totalAppraisals, appraisalsByStatus, roleDistribution] =
+        await Promise.all([
+          prisma.user.count(),
+          prisma.appraisal.count(),
+          prisma.appraisal.groupBy({ by: ["status"], _count: true }),
+          prisma.userRole.groupBy({ by: ["role"], _count: true }),
+        ]);
 
       res.json({
         success: true,
@@ -205,17 +200,18 @@ router.post(
       }
 
       // Create the role assignment
-      await prisma.userRole.create({
-        data: { userId, role },
-      });
-
-      await writeAuditLog({
-        actorId: req.auth?.sub || "",
-        action: "admin.role_assigned",
-        resource: "UserRole",
-        resourceId: userId,
-        meta: { role, userEmail: user.email },
-      });
+      await Promise.all([
+        prisma.userRole.create({
+          data: { userId, role },
+        }),
+        writeAuditLog({
+          actorId: req.auth?.sub || "",
+          action: "admin.role_assigned",
+          resource: "UserRole",
+          resourceId: userId,
+          meta: { role, userEmail: user.email },
+        }),
+      ]);
 
       res.json({
         success: true,
@@ -376,7 +372,12 @@ router.get(
 
       const appraisals = await prisma.appraisal.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          status: true,
+          submittedAt: true,
+          finalScore: true,
+          finalPercent: true,
           cycle: {
             select: { id: true, name: true, startDate: true, endDate: true },
           },
@@ -393,7 +394,7 @@ router.get(
               },
             },
           },
-          items: { select: { id: true, key: true, points: true, notes: true } },
+          items: { select: { points: true } },
         },
         orderBy: { submittedAt: "desc" },
       });
@@ -446,27 +447,33 @@ router.get(
         where.user = { departmentId: departmentId as string };
       }
 
-      const appraisals = await prisma.appraisal.findMany({
-        where,
-        select: {
-          status: true,
-          finalPercent: true,
-          user: {
-            select: { facultyProfile: { select: { currentSalary: true } } },
-          },
-        },
-      });
+      // Counts are pushed to the DB (cheap native COUNT), while the salary-impact
+      // figure still sums in JS from the minimal fields needed — kept identical
+      // to the previous calculation (same fields, same per-row arithmetic, same
+      // summation order) since it's a money calculation not worth any risk of
+      // a raw-SQL floating-point mismatch.
+      const [pendingCount, approvedCount, totalAppraisals, salaryRows] =
+        await Promise.all([
+          prisma.appraisal.count({
+            where: { ...where, status: { in: ["ADMIN_REVIEW", "SUPER_ADMIN_PENDING"] } },
+          }),
+          prisma.appraisal.count({
+            where: { ...where, status: "FULLY_APPROVED" },
+          }),
+          prisma.appraisal.count({ where }),
+          prisma.appraisal.findMany({
+            where,
+            select: {
+              finalPercent: true,
+              user: {
+                select: { facultyProfile: { select: { currentSalary: true } } },
+              },
+            },
+          }),
+        ]);
 
-      let pendingCount = 0;
-      let approvedCount = 0;
       let totalSalaryImpact = 0;
-
-      for (const appraisal of appraisals) {
-        if (appraisal.status === "ADMIN_REVIEW" || appraisal.status === "SUPER_ADMIN_PENDING") {
-          pendingCount++;
-        } else if (appraisal.status === "FULLY_APPROVED") {
-          approvedCount++;
-        }
+      for (const appraisal of salaryRows) {
         const currentSalary = appraisal.user.facultyProfile?.currentSalary ?? 0;
         const percent = appraisal.finalPercent ?? 0;
         totalSalaryImpact += (currentSalary * percent) / 100;
@@ -479,7 +486,7 @@ router.get(
           pendingCount,
           approvedCount,
           totalSalaryImpact,
-          totalAppraisals: appraisals.length,
+          totalAppraisals,
         },
       });
     } catch (error) {
@@ -499,7 +506,13 @@ router.get(
 
       const appraisal = await prisma.appraisal.findUnique({
         where: { id: appraisalId },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          finalScore: true,
+          finalPercent: true,
+          superAdminApprovedPercent: true,
+          superAdminRemark: true,
           user: {
             select: {
               id: true,
@@ -587,13 +600,16 @@ router.post(
 
       const appraisal = await prisma.appraisal.findUnique({
         where: { id: appraisalId },
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          finalPercent: true,
           user: {
             select: {
               facultyProfile: { select: { currentSalary: true } },
             },
           },
-          items: true,
         },
       });
 
@@ -618,41 +634,45 @@ router.post(
       const revisedSalary =
         currentSalary + (currentSalary * finalPercent) / 100;
 
-      await prisma.$transaction(async (transaction) => {
-        // Update appraisal status and approval details
-        await transaction.appraisal.update({
-          where: { id: appraisalId },
-          data: {
-            status: "FULLY_APPROVED",
-            superAdminApprovedPercent: finalPercent,
-            superAdminRemark: parsed.remark?.trim() || null,
-          },
-        });
-
-        // Update faculty profile with new salary
-        if (appraisal.user.facultyProfile) {
-          await transaction.facultyProfile.update({
-            where: { userId: appraisal.userId },
+      // The audit write's fields are all already known pre-transaction and
+      // don't depend on the transaction's outcome, so run it concurrently
+      // instead of waiting for the transaction to finish first.
+      await Promise.all([
+        prisma.$transaction(async (transaction) => {
+          // Update appraisal status and approval details
+          await transaction.appraisal.update({
+            where: { id: appraisalId },
             data: {
-              currentSalary: revisedSalary,
-              lastIncrementDate: new Date(),
+              status: "FULLY_APPROVED",
+              superAdminApprovedPercent: finalPercent,
+              superAdminRemark: parsed.remark?.trim() || null,
             },
           });
-        }
-      });
 
-      await writeAuditLog({
-        actorId,
-        action: "appraisal.super_admin.approved",
-        resource: "Appraisal",
-        resourceId: appraisalId,
-        meta: {
-          finalPercent,
-          adjustedPercent: parsed.adjustedPercent,
-          oldSalary: currentSalary,
-          newSalary: revisedSalary,
-        },
-      });
+          // Update faculty profile with new salary
+          if (appraisal.user.facultyProfile) {
+            await transaction.facultyProfile.update({
+              where: { userId: appraisal.userId },
+              data: {
+                currentSalary: revisedSalary,
+                lastIncrementDate: new Date(),
+              },
+            });
+          }
+        }),
+        writeAuditLog({
+          actorId,
+          action: "appraisal.super_admin.approved",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: {
+            finalPercent,
+            adjustedPercent: parsed.adjustedPercent,
+            oldSalary: currentSalary,
+            newSalary: revisedSalary,
+          },
+        }),
+      ]);
 
       res.json({
         success: true,

@@ -41,17 +41,23 @@ function AppraisalsPage() {
     try {
       setLoading(true);
 
-      // Load faculty appraisal status to get active cycle info
-      try {
-        const statusResponse = await api.faculty.getAppraisalStatus();
-        setActiveCycleInfo(statusResponse.data);
-      } catch {
-        // If status endpoint fails, continue anyway
-        setActiveCycleInfo(null);
+      // Status and list are independent of each other, so fetch both
+      // concurrently instead of one after the other.
+      const [statusResult, listResult] = await Promise.allSettled([
+        api.faculty.getAppraisalStatus(),
+        api.appraisals.list(),
+      ]);
+
+      // If status endpoint fails, continue anyway
+      setActiveCycleInfo(
+        statusResult.status === "fulfilled" ? statusResult.value.data : null,
+      );
+
+      if (listResult.status === "rejected") {
+        throw listResult.reason;
       }
 
-      const listResponse = await api.appraisals.list();
-      const base = listResponse.data ?? [];
+      const base = listResult.value.data ?? [];
 
       const detailed = await Promise.allSettled(
         base.map(async (item) => {

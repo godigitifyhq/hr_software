@@ -1,5 +1,6 @@
 import express from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import {
   authenticateRequest,
   AuthenticatedRequest,
@@ -55,7 +56,21 @@ function facultyIncrement(totalPoints: number) {
   return 15;
 }
 
-async function isHodForUser(hodId: string, departmentId: string | null) {
+// Evaluated from a department.hodId already present in an earlier query's
+// select, avoiding the extra round trip isHodForDepartmentId below needs —
+// used only where the fetched user/department object isn't returned as-is
+// in the response (so adding `hodId` to the select can't leak into the API).
+function isHodOfDepartment(
+  hodId: string,
+  department: { hodId?: string | null } | null | undefined,
+) {
+  return Boolean(department?.hodId && department.hodId === hodId);
+}
+
+// DB-backed check, kept for call sites that return the fetched user/department
+// object directly in the response — adding hodId to that select would leak
+// a new field into the API response, so this stays a separate query there.
+async function isHodForDepartmentId(hodId: string, departmentId: string | null) {
   if (!departmentId) {
     return false;
   }
@@ -108,7 +123,13 @@ router.post(
           id: true,
           status: true,
           userId: true,
-          user: { select: { departmentId: true } },
+          locked: true,
+          user: {
+            select: {
+              departmentId: true,
+              department: { select: { hodId: true } },
+            },
+          },
         },
       });
 
@@ -131,9 +152,9 @@ router.post(
         req.auth?.roles?.includes("HR") ||
         req.auth?.roles?.includes("SUPER_ADMIN");
       if (!isHr) {
-        const hasDepartmentMatch = await isHodForUser(
+        const hasDepartmentMatch = isHodOfDepartment(
           actorId,
-          appraisal.user.departmentId ?? null,
+          appraisal.user.department,
         );
         if (!hasDepartmentMatch) {
           res.status(403).json({ success: false, message: "Access denied" });
@@ -146,6 +167,7 @@ router.post(
         actorId,
         remarks,
         metrics,
+        locked: appraisal.locked,
       });
       res.json({ success: true, message: "Appraisal scored", data: result });
     } catch (error) {
@@ -206,7 +228,12 @@ router.get(
             roles: { some: { role: "FACULTY" } },
           },
         },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          submittedAt: true,
+          finalScore: true,
+          hodRemarks: true,
           cycle: {
             select: { id: true, name: true, startDate: true, endDate: true },
           },
@@ -343,7 +370,7 @@ router.get(
         return;
       }
 
-      const allowed = await isHodForUser(
+      const allowed = await isHodForDepartmentId(
         hodId,
         appraisal.user.departmentId ?? null,
       );
@@ -455,6 +482,7 @@ router.put(
             select: {
               id: true,
               departmentId: true,
+              department: { select: { hodId: true } },
               roles: { select: { role: true } },
             },
           },
@@ -503,10 +531,7 @@ router.put(
         return;
       }
 
-      const allowed = await isHodForUser(
-        hodId,
-        appraisal.user.departmentId ?? null,
-      );
+      const allowed = isHodOfDepartment(hodId, appraisal.user.department);
       if (!allowed && !req.auth?.roles?.includes("SUPER_ADMIN")) {
         res.status(403).json({ success: false, message: "Access denied" });
         return;
@@ -577,32 +602,41 @@ router.put(
         select: { id: true },
       });
 
-      // Update item notes outside the transaction to avoid interactive-transaction timeout
-      for (const reviewed of parsed.items) {
-        const existing = byId.get(reviewed.itemId);
-        if (!existing) {
-          continue;
-        }
+      // Single batched statement instead of one UPDATE per item (previously
+      // sequential round trips outside a transaction to avoid the
+      // interactive-transaction timeout). A raw multi-row UPDATE achieves the
+      // same atomicity-free, no-timeout behavior in one round trip.
+      const reviewedAt = new Date().toISOString();
+      const itemUpdateRows = parsed.items
+        .map((reviewed) => {
+          const existing = byId.get(reviewed.itemId);
+          if (!existing) {
+            return null;
+          }
 
-        const baseNotes = parseItemNotes(existing.notes);
-        const nextNotes = {
-          ...baseNotes,
-          hodReview: {
-            originalPoints: existing.points,
-            approvedPoints: reviewed.approvedPoints,
-            remark: reviewed.remark?.trim() || null,
-            reviewedBy: hodId,
-            reviewedAt: new Date().toISOString(),
-          },
-        };
+          const baseNotes = parseItemNotes(existing.notes);
+          const nextNotes = {
+            ...baseNotes,
+            hodReview: {
+              originalPoints: existing.points,
+              approvedPoints: reviewed.approvedPoints,
+              remark: reviewed.remark?.trim() || null,
+              reviewedBy: hodId,
+              reviewedAt,
+            },
+          };
 
-        await prisma.appraisalItem.update({
-          where: { id: reviewed.itemId },
-          data: {
-            points: reviewed.approvedPoints,
-            notes: JSON.stringify(nextNotes),
-          },
-        });
+          return Prisma.sql`(${reviewed.itemId}::text, ${reviewed.approvedPoints}::int, ${JSON.stringify(nextNotes)}::text)`;
+        })
+        .filter((row): row is Prisma.Sql => row !== null);
+
+      if (itemUpdateRows.length > 0) {
+        await prisma.$executeRaw`
+          UPDATE "AppraisalItem" AS ai
+          SET points = v.points, notes = v.notes
+          FROM (VALUES ${Prisma.join(itemUpdateRows)}) AS v(id, points, notes)
+          WHERE ai.id = v.id
+        `;
       }
 
       // Batch transaction for atomic status update + committee assignment reset
@@ -689,7 +723,16 @@ router.put(
 
       const appraisal = await prisma.appraisal.findUnique({
         where: { id: appraisalId },
-        include: { user: { select: { id: true, departmentId: true, roles: { select: { role: true } } } } },
+        include: {
+          user: {
+            select: {
+              id: true,
+              departmentId: true,
+              department: { select: { hodId: true } },
+              roles: { select: { role: true } },
+            },
+          },
+        },
       });
 
       if (!appraisal) {
@@ -702,7 +745,7 @@ router.put(
         return;
       }
 
-      const allowed = await isHodForUser(hodId, appraisal.user.departmentId ?? null);
+      const allowed = isHodOfDepartment(hodId, appraisal.user.department);
       if (!allowed && !req.auth?.roles?.includes("SUPER_ADMIN")) {
         res.status(403).json({ success: false, message: "Access denied" });
         return;
@@ -870,25 +913,10 @@ router.put(
       const { appraisalId } = req.params;
       const parsed = committeeReviewSchema.parse(req.body ?? {});
 
-      // Check if committee member is assigned to this appraisal.
-      // If no committee is assigned at all, any committee member may review.
-      const anyAssignment = await prisma.committeeAssignment.findFirst({
-        where: { appraisalId },
-      });
-
-      if (anyAssignment) {
-        const memberAssignment = await prisma.committeeAssignment.findFirst({
-          where: {
-            appraisalId,
-            committee: { members: { some: { id: committeeId } } },
-          },
-        });
-        if (!memberAssignment) {
-          res.status(403).json({ success: false, message: "Access denied" });
-          return;
-        }
-      }
-
+      // Fetch the appraisal together with committee-assignment/membership data
+      // in one query instead of two separate assignment lookups followed by
+      // a third fetch — "any assignment exists" and "this member is assigned"
+      // are both derivable from the same relation.
       const appraisal = await prisma.appraisal.findUnique({
         where: { id: appraisalId },
         include: {
@@ -900,6 +928,15 @@ router.put(
               notes: true,
             },
           },
+          committeeAssignments: {
+            select: {
+              committee: {
+                select: {
+                  members: { where: { id: committeeId }, select: { id: true } },
+                },
+              },
+            },
+          },
         },
       });
 
@@ -908,6 +945,19 @@ router.put(
           .status(404)
           .json({ success: false, message: "Appraisal not found" });
         return;
+      }
+
+      // Check if committee member is assigned to this appraisal.
+      // If no committee is assigned at all, any committee member may review.
+      const anyAssignment = appraisal.committeeAssignments.length > 0;
+      if (anyAssignment) {
+        const memberAssignment = appraisal.committeeAssignments.some(
+          (assignment) => assignment.committee.members.length > 0,
+        );
+        if (!memberAssignment) {
+          res.status(403).json({ success: false, message: "Access denied" });
+          return;
+        }
       }
 
       if (!["COMMITTEE_REVIEW", "HR_FINALIZED"].includes(appraisal.status)) {
@@ -979,29 +1029,37 @@ router.put(
         parsed.items.reduce((sum, item) => sum + item.approvedPoints, 0) +
         (parsed.additionalPoints ?? 0);
 
-      // Update items outside the transaction to avoid the 5-second interactive timeout
-      for (const reviewed of parsed.items) {
-        const existing = byId.get(reviewed.itemId);
-        if (!existing) continue;
+      // Single batched statement instead of one UPDATE per item (previously
+      // sequential round trips outside a transaction to avoid the 5-second
+      // interactive timeout).
+      const committeeReviewedAt = new Date().toISOString();
+      const committeeItemUpdateRows = parsed.items
+        .map((reviewed) => {
+          const existing = byId.get(reviewed.itemId);
+          if (!existing) return null;
 
-        const baseNotes = parseItemNotes(existing.notes);
-        const nextNotes = {
-          ...baseNotes,
-          committeeReview: {
-            approvedPoints: reviewed.approvedPoints,
-            remark: reviewed.remark?.trim() || null,
-            reviewedBy: committeeId,
-            reviewedAt: new Date().toISOString(),
-          },
-        };
+          const baseNotes = parseItemNotes(existing.notes);
+          const nextNotes = {
+            ...baseNotes,
+            committeeReview: {
+              approvedPoints: reviewed.approvedPoints,
+              remark: reviewed.remark?.trim() || null,
+              reviewedBy: committeeId,
+              reviewedAt: committeeReviewedAt,
+            },
+          };
 
-        await prisma.appraisalItem.update({
-          where: { id: reviewed.itemId },
-          data: {
-            points: reviewed.approvedPoints,
-            notes: JSON.stringify(nextNotes),
-          },
-        });
+          return Prisma.sql`(${reviewed.itemId}::text, ${reviewed.approvedPoints}::int, ${JSON.stringify(nextNotes)}::text)`;
+        })
+        .filter((row): row is Prisma.Sql => row !== null);
+
+      if (committeeItemUpdateRows.length > 0) {
+        await prisma.$executeRaw`
+          UPDATE "AppraisalItem" AS ai
+          SET points = v.points, notes = v.notes
+          FROM (VALUES ${Prisma.join(committeeItemUpdateRows)}) AS v(id, points, notes)
+          WHERE ai.id = v.id
+        `;
       }
 
       // Only the final status update needs to be atomic

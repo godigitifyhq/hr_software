@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
+import { useFilterData } from "@/hooks/useFilterData";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 import type { SuperAdminAppraisalSummary } from "@/lib/api";
@@ -27,10 +28,7 @@ function SuperAdminAppraislalsPage() {
   );
   const [departmentFilter, setDepartmentFilter] = useState<string>("");
   const [cycleFilter, setCycleFilter] = useState<string>("");
-  const [departments, setDepartments] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [cycles, setCycles] = useState<Array<{ id: string; name: string }>>([]);
+  const { departments, cycles } = useFilterData();
   const [stats, setStats] = useState({
     pendingCount: 0,
     approvedCount: 0,
@@ -90,8 +88,6 @@ function SuperAdminAppraislalsPage() {
       router.push("/unauthorized");
       return;
     }
-
-    loadFilters();
   }, [session, router]);
 
   useEffect(() => {
@@ -109,19 +105,6 @@ function SuperAdminAppraislalsPage() {
 
     void loadStats();
   }, [session, loadStats]);
-
-  async function loadFilters() {
-    try {
-      const [deptsRes, cyclesRes] = await Promise.all([
-        api.departments.list(),
-        api.appraisals.getCycles(),
-      ]);
-      setDepartments(deptsRes.data?.map((d: any) => ({ id: d.id, name: d.name })) ?? []);
-      setCycles(cyclesRes.data?.map((c: any) => ({ id: c.id, name: c.name })) ?? []);
-    } catch (err) {
-      console.error("Failed to load filters:", err);
-    }
-  }
 
   const { pendingCount, approvedCount, totalSalaryImpact, totalAppraisals } =
     stats;

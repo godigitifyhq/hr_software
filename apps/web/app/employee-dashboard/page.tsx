@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";
+import { getCachedFacultyProfile } from "@/lib/faculty-access";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 import type { FacultyProfile } from "@svgoi/shared-types";
@@ -116,7 +117,7 @@ function EmployeeDashboardContent() {
     async function loadProfile() {
       try {
         setLoading(true);
-        const response = await api.faculty.getProfile();
+        const response = await getCachedFacultyProfile();
 
         if (!active) return;
 

@@ -26,6 +26,7 @@ import { useToast } from "@/components/ui/Toast";
 import { DocumentUploadCard } from "@/components/upload/DocumentUploadCard";
 import { api } from "@/lib/api";
 import { API_ORIGIN } from "@/lib/api-client";
+import { invalidateFacultyProfileCache } from "@/lib/faculty-access";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
 
@@ -404,6 +405,7 @@ function FacultyProfileSection() {
 
       const response = await api.faculty.saveProfile(payload);
       setProfile(response.data);
+      invalidateFacultyProfileCache();
       toast({
         title: "Success",
         description: "Faculty profile saved successfully.",

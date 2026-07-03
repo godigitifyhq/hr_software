@@ -296,7 +296,11 @@ router.get(
             },
           ],
         },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          submittedAt: true,
+          finalScore: true,
           cycle: {
             select: {
               id: true,
@@ -317,14 +321,8 @@ router.get(
           },
           items: {
             select: {
-              id: true,
-              key: true,
               points: true,
-              notes: true,
             },
-          },
-          committeeAssignments: {
-            select: { committeeId: true },
           },
         },
         orderBy: { submittedAt: "desc" },
@@ -549,13 +547,18 @@ router.post(
       }
 
       const parsed = committeeReviewSchema.parse(req.body);
+      // Selects firstName/lastName up front (not just id) so this same fetch
+      // can also supply the committeeAssignments block of the response below,
+      // instead of the update() call re-fetching the identical relation.
       const appraisal = await prisma.appraisal.findUnique({
         where: { id: appraisalId },
         include: {
           committeeAssignments: {
             include: {
               committee: {
-                include: { members: { select: { id: true } } },
+                include: {
+                  members: { select: { id: true, firstName: true, lastName: true } },
+                },
               },
             },
           },
@@ -593,51 +596,46 @@ router.post(
         });
       }
 
-      const updated = await prisma.appraisal.update({
-        where: { id: appraisalId },
-        data: {
-          committeeNotes: parsed.notes.trim(),
-          status: "HR_FINALIZED",
-          locked: true,
-        },
-        include: {
-          cycle: true,
-          user: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              departmentId: true,
-            },
+      // committeeAssignments already fetched above and unchanged by this
+      // update, so it's attached from there instead of being included (and
+      // refetched) again here. The audit write's fields don't depend on the
+      // update's result (resourceId is just appraisalId either way), so it
+      // runs concurrently instead of after.
+      const [updated] = await Promise.all([
+        prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            committeeNotes: parsed.notes.trim(),
+            status: "HR_FINALIZED",
+            locked: true,
           },
-          items: true,
-          committeeAssignments: {
-            include: {
-              committee: {
-                include: {
-                  members: {
-                    select: { id: true, firstName: true, lastName: true },
-                  },
-                },
+          include: {
+            cycle: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                departmentId: true,
               },
             },
+            items: true,
           },
-        },
-      });
-
-      await writeAuditLog({
-        actorId: userId,
-        action: "appraisal.committee.review.finalized",
-        resource: "Appraisal",
-        resourceId: updated.id,
-        meta: { notes: parsed.notes.trim() },
-      });
+        }),
+        writeAuditLog({
+          actorId: userId,
+          action: "appraisal.committee.review.finalized",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: { notes: parsed.notes.trim() },
+        }),
+      ]);
 
       res.json({
         success: true,
         message: "Committee review saved successfully",
-        data: updated,
+        data: { ...updated, committeeAssignments: appraisal.committeeAssignments },
       });
     } catch (error) {
       next(error);
@@ -693,6 +691,8 @@ router.post(
 
       const { finalScore, finalPercent } = computeFinalScores(appraisal.items);
 
+      // Items aren't modified by this handler, so the ones already fetched
+      // above are reused instead of being included (and refetched) again here.
       const updated = await prisma.appraisal.update({
         where: { id: appraisalId },
         data: {
@@ -704,14 +704,13 @@ router.post(
         },
         include: {
           cycle: true,
-          items: true,
         },
       });
 
       res.json({
         success: true,
         message: "Appraisal submitted successfully",
-        data: updated,
+        data: { ...updated, items: appraisal.items },
       });
     } catch (error) {
       next(error);

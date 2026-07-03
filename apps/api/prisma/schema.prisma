@@ -173,6 +173,7 @@ model AppraisalCycle {
   placementStats PlacementStat[]
 
   @@index([isActive])
+  @@index([isActive, startDate])
 }
 
 model Appraisal {
@@ -302,6 +303,7 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([resource, resourceId])
+  @@index([createdAt])
 }
 
 model Publication {

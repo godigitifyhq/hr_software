@@ -839,10 +839,16 @@ router.get(
       const isHodCaller = (req.auth?.roles ?? []).includes("HOD");
       let effectiveStatus = appraisal.status;
       if (isHodCaller && appraisal.status === "HOD_REVIEW") {
-        await prisma.appraisal.update({
-          where: { id: appraisal.id },
-          data: { status: "COMMITTEE_REVIEW" },
-        });
+        // Response below is already computed from effectiveStatus, so this
+        // housekeeping write doesn't need to block the read response.
+        prisma.appraisal
+          .update({
+            where: { id: appraisal.id },
+            data: { status: "COMMITTEE_REVIEW" },
+          })
+          .catch((err) =>
+            console.error("Failed to auto-advance HOD appraisal status:", err),
+          );
         effectiveStatus = "COMMITTEE_REVIEW";
       }
 
@@ -884,21 +890,27 @@ router.get(
         return;
       }
 
-      const cycles = await prisma.appraisalCycle.findMany({
-        orderBy: { startDate: "desc" },
-      });
-
-      const appraisals = await prisma.appraisal.findMany({
-        where: { userId, cycleId: { in: cycles.map((c) => c.id) } },
-        select: {
-          id: true,
-          cycleId: true,
-          status: true,
-          submittedAt: true,
-          finalScore: true,
-          finalPercent: true,
-        },
-      });
+      // Every appraisal.cycleId references an existing AppraisalCycle row (FK),
+      // and `cycles` above is unfiltered (all cycles) — so filtering appraisals
+      // by userId alone yields the exact same set as filtering by cycleId IN
+      // (all cycle ids), letting both queries run concurrently instead of the
+      // second depending on the first's result.
+      const [cycles, appraisals] = await Promise.all([
+        prisma.appraisalCycle.findMany({
+          orderBy: { startDate: "desc" },
+        }),
+        prisma.appraisal.findMany({
+          where: { userId },
+          select: {
+            id: true,
+            cycleId: true,
+            status: true,
+            submittedAt: true,
+            finalScore: true,
+            finalPercent: true,
+          },
+        }),
+      ]);
 
       const appraisalByCycle = new Map(
         appraisals.map((a) => [a.cycleId, a]),
@@ -1226,10 +1238,20 @@ router.post(
         return;
       }
 
-      const department = await prisma.department.findUnique({
-        where: { id: user.departmentId },
-        select: { id: true, name: true, hodId: true, deletedAt: true },
-      });
+      // Department lookup and active-cycle lookup are independent of each other,
+      // so fire them concurrently. allSettled (not all) keeps the original error
+      // precedence intact: department validation below still runs, and reports,
+      // before the cycle result is ever consulted.
+      const [departmentResult, cycleResult] = await Promise.allSettled([
+        prisma.department.findUnique({
+          where: { id: user.departmentId },
+          select: { id: true, name: true, hodId: true, deletedAt: true },
+        }),
+        getActiveCycleOrThrow(),
+      ]);
+
+      const department =
+        departmentResult.status === "fulfilled" ? departmentResult.value : null;
 
       if (!department || department.deletedAt) {
         res.status(400).json({
@@ -1256,7 +1278,10 @@ router.post(
         selectedByKey.set(entry.criterionKey, entry);
       });
 
-      const cycle = await getActiveCycleOrThrow();
+      if (cycleResult.status === "rejected") {
+        throw cycleResult.reason;
+      }
+      const cycle = cycleResult.value;
       const existingAppraisal = await prisma.appraisal.findFirst({
         where: { userId, cycleId: cycle.id },
       });
@@ -1415,26 +1440,27 @@ router.post(
       const comment = (req.body && (req.body as any).comment) || null;
 
       if (action === "approve") {
-        await prisma.appraisal.update({
-          where: { id: appraisalId },
-          data: {
-            status: "COMMITTEE_REVIEW",
-          },
-        });
-
-        await prisma.auditLog.create({
-          data: {
-            actorId: reviewerId ?? undefined,
-            action: "APPRAISAL_HOD_APPROVE",
-            resource: "Appraisal",
-            resourceId: appraisalId,
-            meta: JSON.stringify({
-              comment,
-              previousStatus: appraisal.status,
-              newStatus: "COMMITTEE_REVIEW",
-            }),
-          },
-        });
+        await Promise.all([
+          prisma.appraisal.update({
+            where: { id: appraisalId },
+            data: {
+              status: "COMMITTEE_REVIEW",
+            },
+          }),
+          prisma.auditLog.create({
+            data: {
+              actorId: reviewerId ?? undefined,
+              action: "APPRAISAL_HOD_APPROVE",
+              resource: "Appraisal",
+              resourceId: appraisalId,
+              meta: JSON.stringify({
+                comment,
+                previousStatus: appraisal.status,
+                newStatus: "COMMITTEE_REVIEW",
+              }),
+            },
+          }),
+        ]);
 
         res.json({
           success: true,
@@ -1444,28 +1470,29 @@ router.post(
       }
 
       // reject -> revert to DRAFT so faculty can edit/resubmit
-      await prisma.appraisal.update({
-        where: { id: appraisalId },
-        data: {
-          status: "DRAFT",
-          locked: false,
-          submittedAt: null,
-        },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          actorId: reviewerId ?? undefined,
-          action: "APPRAISAL_HOD_REJECT",
-          resource: "Appraisal",
-          resourceId: appraisalId,
-          meta: JSON.stringify({
-            comment,
-            previousStatus: appraisal.status,
-            newStatus: "DRAFT",
-          }),
-        },
-      });
+      await Promise.all([
+        prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            status: "DRAFT",
+            locked: false,
+            submittedAt: null,
+          },
+        }),
+        prisma.auditLog.create({
+          data: {
+            actorId: reviewerId ?? undefined,
+            action: "APPRAISAL_HOD_REJECT",
+            resource: "Appraisal",
+            resourceId: appraisalId,
+            meta: JSON.stringify({
+              comment,
+              previousStatus: appraisal.status,
+              newStatus: "DRAFT",
+            }),
+          },
+        }),
+      ]);
 
       res.json({
         success: true,
@@ -1514,26 +1541,27 @@ router.post(
       }
 
       if (action === "approve") {
-        await prisma.appraisal.update({
-          where: { id: appraisalId },
-          data: {
-            status: "HR_FINALIZED",
-          },
-        });
-
-        await prisma.auditLog.create({
-          data: {
-            actorId: req.auth?.sub ?? undefined,
-            action: "APPRAISAL_COMMITTEE_APPROVE",
-            resource: "Appraisal",
-            resourceId: appraisalId,
-            meta: JSON.stringify({
-              comment: (req.body as any)?.comment ?? null,
-              previousStatus: appraisal.status,
-              newStatus: "HR_FINALIZED",
-            }),
-          },
-        });
+        await Promise.all([
+          prisma.appraisal.update({
+            where: { id: appraisalId },
+            data: {
+              status: "HR_FINALIZED",
+            },
+          }),
+          prisma.auditLog.create({
+            data: {
+              actorId: req.auth?.sub ?? undefined,
+              action: "APPRAISAL_COMMITTEE_APPROVE",
+              resource: "Appraisal",
+              resourceId: appraisalId,
+              meta: JSON.stringify({
+                comment: (req.body as any)?.comment ?? null,
+                previousStatus: appraisal.status,
+                newStatus: "HR_FINALIZED",
+              }),
+            },
+          }),
+        ]);
 
         res.json({
           success: true,
@@ -1543,28 +1571,29 @@ router.post(
       }
 
       // reject -> revert to DRAFT
-      await prisma.appraisal.update({
-        where: { id: appraisalId },
-        data: {
-          status: "DRAFT",
-          locked: false,
-          submittedAt: null,
-        },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          actorId: req.auth?.sub ?? undefined,
-          action: "APPRAISAL_COMMITTEE_REJECT",
-          resource: "Appraisal",
-          resourceId: appraisalId,
-          meta: JSON.stringify({
-            comment: (req.body as any)?.comment ?? null,
-            previousStatus: appraisal.status,
-            newStatus: "DRAFT",
-          }),
-        },
-      });
+      await Promise.all([
+        prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            status: "DRAFT",
+            locked: false,
+            submittedAt: null,
+          },
+        }),
+        prisma.auditLog.create({
+          data: {
+            actorId: req.auth?.sub ?? undefined,
+            action: "APPRAISAL_COMMITTEE_REJECT",
+            resource: "Appraisal",
+            resourceId: appraisalId,
+            meta: JSON.stringify({
+              comment: (req.body as any)?.comment ?? null,
+              previousStatus: appraisal.status,
+              newStatus: "DRAFT",
+            }),
+          },
+        }),
+      ]);
 
       res.json({
         success: true,
@@ -1607,28 +1636,29 @@ router.post(
         return;
       }
 
-      await prisma.appraisal.update({
-        where: { id: appraisalId },
-        data: {
-          status: "CLOSED",
-          locked: true,
-          finalScore: finalScore ?? appraisal.finalScore,
-          finalPercent: finalPercent ?? appraisal.finalPercent,
-        },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          actorId: req.auth?.sub ?? undefined,
-          action: "APPRAISAL_HR_FINALIZE",
-          resource: "Appraisal",
-          resourceId: appraisalId,
-          meta: JSON.stringify({
+      await Promise.all([
+        prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: {
+            status: "CLOSED",
+            locked: true,
             finalScore: finalScore ?? appraisal.finalScore,
             finalPercent: finalPercent ?? appraisal.finalPercent,
-          }),
-        },
-      });
+          },
+        }),
+        prisma.auditLog.create({
+          data: {
+            actorId: req.auth?.sub ?? undefined,
+            action: "APPRAISAL_HR_FINALIZE",
+            resource: "Appraisal",
+            resourceId: appraisalId,
+            meta: JSON.stringify({
+              finalScore: finalScore ?? appraisal.finalScore,
+              finalPercent: finalPercent ?? appraisal.finalPercent,
+            }),
+          },
+        }),
+      ]);
 
       res.json({ success: true, message: "Appraisal finalized by HR" });
     } catch (error) {

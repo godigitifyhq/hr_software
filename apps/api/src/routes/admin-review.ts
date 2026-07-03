@@ -1,5 +1,6 @@
 import express from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import {
   authenticateRequest,
   AuthenticatedRequest,
@@ -291,28 +292,38 @@ router.put(
       const totalApproved = itemApproved + hodAdditionalPoints;
       const incrementPercent = facultyIncrement(totalApproved);
 
-      for (const reviewed of parsed.items) {
-        const existing = byId.get(reviewed.itemId);
-        if (!existing) continue;
+      // Single batched statement instead of one UPDATE per item.
+      const adminReviewedAt = new Date().toISOString();
+      const adminItemUpdateRows = parsed.items
+        .map((reviewed) => {
+          const existing = byId.get(reviewed.itemId);
+          if (!existing) return null;
 
-        const baseNotes = parseItemNotes(existing.notes);
-        const nextNotes = {
-          ...baseNotes,
-          adminReview: {
-            approvedPoints: reviewed.approvedPoints,
-            remark: reviewed.remark?.trim() || null,
-            reviewedBy: actorId,
-            reviewedAt: new Date().toISOString(),
-          },
-        };
+          const baseNotes = parseItemNotes(existing.notes);
+          const nextNotes = {
+            ...baseNotes,
+            adminReview: {
+              approvedPoints: reviewed.approvedPoints,
+              remark: reviewed.remark?.trim() || null,
+              reviewedBy: actorId,
+              reviewedAt: adminReviewedAt,
+            },
+          };
 
-        await prisma.appraisalItem.update({
-          where: { id: reviewed.itemId },
-          data: { points: reviewed.approvedPoints, notes: JSON.stringify(nextNotes) },
-        });
+          return Prisma.sql`(${reviewed.itemId}::text, ${reviewed.approvedPoints}::int, ${JSON.stringify(nextNotes)}::text)`;
+        })
+        .filter((row): row is Prisma.Sql => row !== null);
+
+      if (adminItemUpdateRows.length > 0) {
+        await prisma.$executeRaw`
+          UPDATE "AppraisalItem" AS ai
+          SET points = v.points, notes = v.notes
+          FROM (VALUES ${Prisma.join(adminItemUpdateRows)}) AS v(id, points, notes)
+          WHERE ai.id = v.id
+        `;
       }
 
-      await prisma.$transaction([
+      await Promise.all([
         prisma.appraisal.update({
           where: { id: appraisalId },
           data: {
@@ -322,19 +333,18 @@ router.put(
             adminRemark: JSON.stringify({
               overallRemark: parsed.overallRemark?.trim() || null,
               reviewedBy: actorId,
-              reviewedAt: new Date().toISOString(),
+              reviewedAt: adminReviewedAt,
             }),
           },
         }),
+        writeAuditLog({
+          actorId,
+          action: "appraisal.admin.review.completed",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: { itemApproved, hodAdditionalPoints, totalApproved, incrementPercent },
+        }),
       ]);
-
-      await writeAuditLog({
-        actorId,
-        action: "appraisal.admin.review.completed",
-        resource: "Appraisal",
-        resourceId: appraisalId,
-        meta: { itemApproved, hodAdditionalPoints, totalApproved, incrementPercent },
-      });
 
       res.json({
         success: true,
@@ -378,18 +388,19 @@ router.put(
         return;
       }
 
-      await prisma.appraisal.update({
-        where: { id: appraisalId },
-        data: { status: "REJECTED", rejectedAt: new Date(), rejectedBy: actorId, rejectionReason: reason.trim() },
-      });
-
-      await writeAuditLog({
-        actorId,
-        action: "appraisal.admin.rejected",
-        resource: "Appraisal",
-        resourceId: appraisalId,
-        meta: { reason },
-      });
+      await Promise.all([
+        prisma.appraisal.update({
+          where: { id: appraisalId },
+          data: { status: "REJECTED", rejectedAt: new Date(), rejectedBy: actorId, rejectionReason: reason.trim() },
+        }),
+        writeAuditLog({
+          actorId,
+          action: "appraisal.admin.rejected",
+          resource: "Appraisal",
+          resourceId: appraisalId,
+          meta: { reason },
+        }),
+      ]);
 
       res.json({ success: true, message: "Appraisal rejected", data: { appraisalId, status: "REJECTED" } });
     } catch (error) {
