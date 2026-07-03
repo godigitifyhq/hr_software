@@ -1,6 +1,7 @@
 // apps/web/src/components/ui/index.ts
 export * from "./AppraisalItemRow";
 export * from "./AppraisalReviewSection";
+export * from "./AppraisalSubmitPreviewDialog";
 export * from "./AvatarInitials";
 export * from "./ConfirmDialog";
 export * from "./DataTable";

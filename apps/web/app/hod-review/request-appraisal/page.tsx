@@ -16,7 +16,7 @@ import { withAuth } from "@/components/auth/withAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { ConfirmDialog } from "@/components/ui";
+import { AppraisalSubmitPreviewDialog, ConfirmDialog } from "@/components/ui";
 import { api } from "@/lib/api";
 import { getPrimaryRole } from "@/lib/utils/routing";
 import { useAuthStore } from "@/store/auth";
@@ -56,6 +56,7 @@ function HodSelfRequestPage() {
     null,
   );
   const [confirmUploadOpen, setConfirmUploadOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -533,7 +534,7 @@ function HodSelfRequestPage() {
               </p>
               <button
                 type="button"
-                onClick={() => void submitRequest()}
+                onClick={() => setPreviewOpen(true)}
                 disabled={submitting}
                 className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-5 text-sm font-medium text-text-inv shadow-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -566,6 +567,19 @@ function HodSelfRequestPage() {
         }}
         onConfirm={() => {
           void confirmPendingUpload();
+        }}
+      />
+
+      <AppraisalSubmitPreviewDialog
+        open={previewOpen}
+        policy={policy}
+        criteriaState={criteriaState}
+        totalPoints={totalPoints}
+        incrementPercent={incrementPercent}
+        submitting={submitting}
+        onCancel={() => setPreviewOpen(false)}
+        onConfirm={() => {
+          void submitRequest().then(() => setPreviewOpen(false));
         }}
       />
     </AppShell>

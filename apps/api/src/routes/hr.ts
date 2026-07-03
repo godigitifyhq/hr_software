@@ -932,7 +932,7 @@ const createDepartmentSchema = z.object({
       firstName: z.string().min(1),
       lastName: z.string().min(1),
       email: z.string().email(),
-      password: z.string().min(12),
+      password: z.string().min(8, "Password must be at least 8 characters long"),
     })
     .optional(),
 });

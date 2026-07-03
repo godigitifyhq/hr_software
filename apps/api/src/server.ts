@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import path from "path";
+import { ZodError } from "zod";
 import authRouter from "./routes/auth";
 import hodRouter from "./routes/hod";
 import hrRouter from "./routes/hr";
@@ -101,6 +102,15 @@ app.use("/api/v1/appraisals", noCache(), appraisalsRouter);
 app.use("/api/v1/uploads", uploadsRouter);
 app.use("/api/v1/drive", driveRouter);
 
+function formatZodError(error: ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.join(".");
+      return path ? `${path}: ${issue.message}` : issue.message;
+    })
+    .join("; ");
+}
+
 // Basic error handler
 app.use(
   (
@@ -109,6 +119,11 @@ app.use(
     res: express.Response,
     _next: express.NextFunction,
   ) => {
+    if (err instanceof ZodError) {
+      res.status(400).json({ success: false, message: formatZodError(err) });
+      return;
+    }
+
     const error =
       err instanceof Error ? err : new Error("Internal server error");
     console.error(err);

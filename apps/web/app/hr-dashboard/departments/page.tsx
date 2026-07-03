@@ -102,6 +102,15 @@ function HrDepartmentsPage() {
       return;
     }
 
+    if (createMode === "new-hod" && newDept.hodPassword.trim().length < 8) {
+      toast({
+        title: "Error",
+        description: "HOD password must be at least 8 characters long.",
+        variant: "error",
+      });
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -338,7 +347,7 @@ function HrDepartmentsPage() {
                   htmlFor="hod-password"
                   className="mb-1 block text-xs font-medium text-text-3"
                 >
-                  HOD Password * (min 12 chars)
+                  HOD Password * (min 8 chars)
                 </label>
                 <input
                   id="hod-password"
