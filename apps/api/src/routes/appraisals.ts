@@ -359,25 +359,33 @@ router.get(
         where: {
           ...(committeeCycleId ? { cycleId: committeeCycleId } : {}),
           status: { in: ["HOD_REVIEW", "COMMITTEE_REVIEW", "HR_FINALIZED", "FULLY_APPROVED"] },
-          OR: [
-            {
-              committeeAssignments: {
-                some: {
-                  committee: { members: { some: { id: userId } } },
-                },
-              },
-            },
-            {
-              AND: [
-                { status: { in: ["COMMITTEE_REVIEW", "HR_FINALIZED", "FULLY_APPROVED"] } },
-                {
-                  committeeAssignments: {
-                    none: {},
+          // Category committees (Academic/Research/Other) review by role, not by
+          // committee assignment — every appraisal in these statuses has items
+          // in their category, so show them all. Legacy COMMITTEE / HR keep the
+          // assignment-based visibility rules.
+          ...(callerCategory
+            ? {}
+            : {
+                OR: [
+                  {
+                    committeeAssignments: {
+                      some: {
+                        committee: { members: { some: { id: userId } } },
+                      },
+                    },
                   },
-                },
-              ],
-            },
-          ],
+                  {
+                    AND: [
+                      { status: { in: ["COMMITTEE_REVIEW", "HR_FINALIZED", "FULLY_APPROVED"] } },
+                      {
+                        committeeAssignments: {
+                          none: {},
+                        },
+                      },
+                    ],
+                  },
+                ],
+              }),
         },
         select: {
           id: true,
@@ -415,17 +423,11 @@ router.get(
         orderBy: { submittedAt: "desc" },
       });
 
-      // Materialise approval rows for any committee-stage appraisal that lacks
-      // them, so the dashboard status board is complete.
-      const missing = appraisals.filter(
-        (a) =>
-          a.status === "COMMITTEE_REVIEW" &&
-          a.categoryApprovals.length < ALL_CATEGORIES.length,
-      );
-      if (missing.length > 0) {
-        await Promise.all(missing.map((a) => ensureCategoryApprovals(a.id)));
-      }
-
+      // Note: we do NOT create approval rows here. On a list endpoint that
+      // would mean many parallel writes (one per appraisal) and can exhaust the
+      // DB connection pool. Appraisals without rows yet correctly render as
+      // "pending" below; the rows are materialised lazily when a committee opens
+      // the appraisal (GET /:id) or approves a category.
       const payload = appraisals.map((appraisal) => {
         // Points visible to this caller: only their category when they hold a
         // category committee role, otherwise the whole appraisal (legacy/HR).

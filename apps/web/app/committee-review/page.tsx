@@ -136,35 +136,47 @@ function CommitteeDashboardPage() {
                 <p className="mt-1 text-sm font-medium text-text">{appraisal.cycle.name}</p>
               </div>
               <div className="rounded-lg bg-bg p-2.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-3">Total Points</p>
-                <p className="mt-1 text-sm font-medium text-text">{appraisal.finalScore}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-3">
+                  {appraisal.callerCategory
+                    ? `${appraisal.callerCategory.charAt(0)}${appraisal.callerCategory
+                        .slice(1)
+                        .toLowerCase()} Points`
+                    : "Total Points"}
+                </p>
+                <p className="mt-1 text-sm font-medium text-text">
+                  {appraisal.totalSelectedPoints ?? 0}
+                </p>
               </div>
               <div className="rounded-lg bg-bg p-2.5">
                 <p className="text-xs font-semibold uppercase tracking-wider text-text-3">Status</p>
                 <div className="mt-1">{getStatusBadge(appraisal.status)}</div>
               </div>
             </div>
-            {appraisal.categoryApprovals && appraisal.categoryApprovals.length > 0 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {appraisal.categoryApprovals.map((c) => (
-                  <span
-                    key={c.category}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      c.approved
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-bg text-text-3"
-                    }`}
-                  >
-                    {c.approved ? (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <span className="h-2 w-2 rounded-full border border-text-3" />
-                    )}
-                    {c.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {(
+                appraisal.categoryApprovals ?? [
+                  { category: "ACADEMICS", label: "Academics", approved: false },
+                  { category: "RESEARCH", label: "Research", approved: false },
+                  { category: "OTHERS", label: "Others", approved: false },
+                ]
+              ).map((c) => (
+                <span
+                  key={c.category}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                    c.approved
+                      ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+                      : "border-border bg-surface-2 text-text-2"
+                  }`}
+                >
+                  {c.approved ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full border-2 border-text-3" />
+                  )}
+                  {c.label}
+                </span>
+              ))}
+            </div>
             <p className="mt-2 text-xs text-text-3">Submitted: {new Date(appraisal.submittedAt).toLocaleDateString()}</p>
           </div>
           <Link

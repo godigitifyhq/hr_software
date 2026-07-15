@@ -190,6 +190,9 @@ function FacultyProfileSection() {
       session?.user.roles.includes("EMPLOYEE") ||
       session?.user.roles.includes("HOD") ||
       session?.user.roles.includes("COMMITTEE") ||
+      session?.user.roles.includes("COMMITTEE_ACADEMIC") ||
+      session?.user.roles.includes("COMMITTEE_RESEARCH") ||
+      session?.user.roles.includes("COMMITTEE_OTHER") ||
       session?.user.roles.includes("HR") ||
       session?.user.roles.includes("MANAGEMENT") ||
       session?.user.roles.includes("ADMIN") ||
