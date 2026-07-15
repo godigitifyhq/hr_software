@@ -69,21 +69,18 @@ const ROLE_NAV: Record<string, { title: string; items: NavItem[] }> = {
     title: "Academic Committee",
     items: [
       { label: "Academic Reviews", href: "/committee-review", icon: Shield },
-      { label: "My Profile", href: "/profile", icon: FileText },
     ],
   },
   COMMITTEE_RESEARCH: {
     title: "Research Committee",
     items: [
       { label: "Research Reviews", href: "/committee-review", icon: Shield },
-      { label: "My Profile", href: "/profile", icon: FileText },
     ],
   },
   COMMITTEE_OTHER: {
     title: "Other Committee",
     items: [
       { label: "Other Reviews", href: "/committee-review", icon: Shield },
-      { label: "My Profile", href: "/profile", icon: FileText },
     ],
   },
   HR: {
